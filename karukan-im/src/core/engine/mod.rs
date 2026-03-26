@@ -108,6 +108,8 @@ pub struct InputMethodEngine {
     learning: Option<LearningCache>,
     /// Text remaining after partial conversion (cursor-based split)
     remaining_after_conversion: Option<String>,
+    /// Number of Space presses in current conversion session
+    conversion_space_count: u32,
 }
 
 impl InputMethodEngine {
@@ -129,6 +131,7 @@ impl InputMethodEngine {
             dicts: Dictionaries::default(),
             learning: None,
             remaining_after_conversion: None,
+            conversion_space_count: 0,
         }
     }
 

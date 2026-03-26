@@ -126,6 +126,8 @@ impl KarukanEngine {
             max_latency_ms: settings.conversion.max_latency_ms,
             strategy: settings.conversion.strategy,
             auto_suggest: settings.conversion.auto_suggest,
+            candidate_window_threshold: settings.conversion.candidate_window_threshold,
+            show_aux_text: settings.conversion.show_aux_text,
         };
         let engine = InputMethodEngine::with_config(config);
         Self {
@@ -197,7 +199,11 @@ impl KarukanEngine {
                     self.commit.dirty = true;
                 }
                 EngineAction::UpdateAuxText(text) => {
-                    self.aux.text = CString::new(text).unwrap_or_default();
+                    if self.settings.conversion.show_aux_text {
+                        self.aux.text = CString::new(text).unwrap_or_default();
+                    } else {
+                        self.aux.text = CString::default();
+                    }
                     self.aux.dirty = true;
                 }
                 EngineAction::HideAuxText => {

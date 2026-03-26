@@ -39,3 +39,57 @@ MIT OR Apache-2.0 のデュアルライセンスで提供しています。
 
 - [MIT License](LICENSE-MIT)
 - [Apache License 2.0](LICENSE-APACHE)
+
+---
+
+## フォーク変更点
+
+本フォークでは、私的な使い勝手を向上させるため以下の変更を加えています。
+
+### 機能追加・修正
+
+#### 1. 末尾「n」の自動変換
+Space変換時に末尾の `n` を自動的に「ん」に変換します。`nn` と入力する必要がなくなりました。
+
+- 対象: `karukan-engine/src/romaji/converter.rs`
+
+#### 2. Shift英字入力後のモード自動復帰
+Shift+英字でアルファベットを入力した後、確定してEmpty状態に戻ると自動的にひらがなモードに復帰します。
+
+- 対象: `karukan-im/src/core/engine/input.rs`
+
+#### 3. カーソル位置による部分変換
+カーソルを移動してからSpaceを押すと、カーソルより前のテキストのみを変換し、残りはComposing状態に戻ります。
+
+- 対象: `karukan-im/src/core/engine/conversion.rs`, `mod.rs`
+
+#### 4. 記号の全角変換
+ひらがなモード時に `#`, `(`, `)`, `@`, `<`, `>` 等の記号が全角に変換されます。
+
+- 対象: `karukan-engine/src/romaji/rules.rs`
+
+### 設定オプション
+
+`~/.config/karukan-im/config.toml` に以下の設定を追加しています。
+
+```toml
+[conversion]
+# 入力中の自動変換候補表示を無効化（false = Spaceキー変換時のみ表示）
+auto_suggest = false
+
+# 変換候補ウインドウを表示するまでのSpace押下回数（0 = 常に表示）
+candidate_window_threshold = 3
+
+# 補助テキスト（推論時間・辞書ソース等）の表示（false = 常に非表示）
+show_aux_text = false
+```
+
+| 設定項目 | デフォルト | 説明 |
+|---|---|---|
+| `auto_suggest` | `true` | 入力中に変換候補を自動表示する |
+| `candidate_window_threshold` | `3` | 候補ウインドウを表示するまでのSpace押下回数。0で常に表示 |
+| `show_aux_text` | `true` | 推論時間・辞書ソース等の補助テキストを表示する |
+
+### 辞書の拡張
+
+jawiki（Wikipedia固有名詞）のシステム辞書統合や、顔文字・絵文字辞書の導入手順については [辞書セットアップガイド](docs/dictionary-setup.md) を参照してください。

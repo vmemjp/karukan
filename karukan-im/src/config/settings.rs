@@ -66,10 +66,20 @@ pub struct ConversionSettings {
     /// Show auto-suggest candidates while typing (false = show only on Space conversion)
     #[serde(default = "default_true")]
     pub auto_suggest: bool,
+    /// Number of Space presses before showing the candidate window (0 = always show)
+    #[serde(default = "default_candidate_window_threshold")]
+    pub candidate_window_threshold: u32,
+    /// Show auxiliary text (inference time, dictionary source, etc.)
+    #[serde(default = "default_true")]
+    pub show_aux_text: bool,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_candidate_window_threshold() -> u32 {
+    3
 }
 
 /// Learning cache settings

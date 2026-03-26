@@ -267,12 +267,24 @@ impl InputMethodEngine {
             candidates: candidates.clone(),
         };
 
-        EngineResult::consumed()
-            .with_action(EngineAction::UpdatePreedit(preedit))
-            .with_action(EngineAction::ShowCandidates(candidates.clone()))
-            .with_action(EngineAction::UpdateAuxText(
-                self.format_aux_conversion_with_page(reading, Some(&candidates)),
-            ))
+        self.conversion_space_count = 1;
+        let threshold = self.config.candidate_window_threshold;
+        let show = threshold == 0 || self.conversion_space_count >= threshold;
+
+        let mut result = EngineResult::consumed()
+            .with_action(EngineAction::UpdatePreedit(preedit));
+        if show {
+            result = result
+                .with_action(EngineAction::ShowCandidates(candidates.clone()))
+                .with_action(EngineAction::UpdateAuxText(
+                    self.format_aux_conversion_with_page(reading, Some(&candidates)),
+                ));
+        } else {
+            result = result
+                .with_action(EngineAction::HideCandidates)
+                .with_action(EngineAction::HideAuxText);
+        }
+        result
     }
 
     /// Search user and system dictionaries for candidates matching a reading.
@@ -540,6 +552,7 @@ impl InputMethodEngine {
 
     /// Commit the current conversion
     fn commit_conversion(&mut self) -> EngineResult {
+        self.conversion_space_count = 0;
         let Some((text, reading)) = self.selected_conversion_info() else {
             return EngineResult::not_consumed();
         };
@@ -597,6 +610,7 @@ impl InputMethodEngine {
         }
 
         self.remaining_after_conversion = None;
+        self.conversion_space_count = 0;
         self.state = InputState::Empty;
         self.input_buf.text.clear();
 
@@ -613,6 +627,7 @@ impl InputMethodEngine {
 
     /// Cancel conversion and return to hiragana
     pub(super) fn cancel_conversion(&mut self) -> EngineResult {
+        self.conversion_space_count = 0;
         if !matches!(self.state, InputState::Conversion { .. }) {
             return EngineResult::not_consumed();
         }
@@ -663,6 +678,7 @@ impl InputMethodEngine {
 
     /// Select next candidate
     fn next_candidate(&mut self) -> EngineResult {
+        self.conversion_space_count += 1;
         self.navigate_candidate(CandidateList::move_next)
     }
 
@@ -704,6 +720,7 @@ impl InputMethodEngine {
         }
 
         // Commit immediately after digit selection
+        self.conversion_space_count = 0;
         let remaining = self.remaining_after_conversion.take();
 
         if let Some(remaining) = remaining {
@@ -758,12 +775,23 @@ impl InputMethodEngine {
             .and_then(|c| c.reading.as_deref())
             .unwrap_or("");
 
-        EngineResult::consumed()
-            .with_action(EngineAction::UpdatePreedit(preedit))
-            .with_action(EngineAction::ShowCandidates(candidates.clone()))
-            .with_action(EngineAction::UpdateAuxText(
-                self.format_aux_conversion_with_page(reading, Some(candidates)),
-            ))
+        let threshold = self.config.candidate_window_threshold;
+        let show = threshold == 0 || self.conversion_space_count >= threshold;
+
+        let mut result = EngineResult::consumed()
+            .with_action(EngineAction::UpdatePreedit(preedit));
+        if show {
+            result = result
+                .with_action(EngineAction::ShowCandidates(candidates.clone()))
+                .with_action(EngineAction::UpdateAuxText(
+                    self.format_aux_conversion_with_page(reading, Some(candidates)),
+                ));
+        } else {
+            result = result
+                .with_action(EngineAction::HideCandidates)
+                .with_action(EngineAction::HideAuxText);
+        }
+        result
     }
 
     /// Handle backspace in conversion mode

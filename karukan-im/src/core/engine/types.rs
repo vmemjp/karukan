@@ -83,6 +83,10 @@ pub struct EngineConfig {
     pub strategy: StrategyMode,
     /// Show auto-suggest candidates while typing (false = show only on Space conversion)
     pub auto_suggest: bool,
+    /// Number of Space presses before showing the candidate window (0 = always show)
+    pub candidate_window_threshold: u32,
+    /// Show auxiliary text (inference time, dictionary source, etc.)
+    pub show_aux_text: bool,
 }
 
 impl Default for EngineConfig {
@@ -96,6 +100,8 @@ impl Default for EngineConfig {
             max_latency_ms: 100,
             strategy: StrategyMode::default(),
             auto_suggest: true,
+            candidate_window_threshold: 3,
+            show_aux_text: true,
         }
     }
 }
