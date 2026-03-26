@@ -23,6 +23,16 @@ impl InputMethodEngine {
             return EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
         }
 
+        // When auto_suggest is disabled, skip candidate display and aux text during composing
+        if !self.config.auto_suggest {
+            self.live.text.clear();
+            let preedit = self.set_composing_state();
+            return EngineResult::consumed()
+                .with_action(EngineAction::UpdatePreedit(preedit))
+                .with_action(EngineAction::HideCandidates)
+                .with_action(EngineAction::HideAuxText);
+        }
+
         // Run auto-suggest (skip in alphabet mode — no hiragana to convert)
         let candidates =
             if self.input_mode != InputMode::Alphabet && !self.input_buf.text.is_empty() {
@@ -109,9 +119,15 @@ impl InputMethodEngine {
             self.input_buf.clear();
             self.input_buf.insert("\u{3000}");
             let preedit = self.set_composing_state();
-            return EngineResult::consumed()
-                .with_action(EngineAction::UpdatePreedit(preedit))
-                .with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+            let mut result =
+                EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
+            if self.config.auto_suggest {
+                result = result
+                    .with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+            } else {
+                result = result.with_action(EngineAction::HideAuxText);
+            }
+            return result;
         }
 
         // Only handle printable characters without modifiers (except shift)
@@ -127,6 +143,8 @@ impl InputMethodEngine {
 
             if is_shift_alpha && self.input_mode != InputMode::Alphabet {
                 self.input_mode = InputMode::Alphabet;
+            } else if !is_shift_alpha && self.input_mode == InputMode::Alphabet {
+                self.input_mode = InputMode::Hiragana;
             }
             let ch = if self.input_mode == InputMode::Alphabet && is_shift_alpha {
                 ch.to_ascii_uppercase()
@@ -182,9 +200,14 @@ impl InputMethodEngine {
 
         let preedit = self.set_composing_state();
 
-        EngineResult::consumed()
-            .with_action(EngineAction::UpdatePreedit(preedit))
-            .with_action(EngineAction::UpdateAuxText(self.format_aux_composing()))
+        let mut result =
+            EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
+        if self.config.auto_suggest {
+            result = result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+        } else {
+            result = result.with_action(EngineAction::HideAuxText);
+        }
+        result
     }
 
     /// Insert a full-width space (U+3000) at cursor position

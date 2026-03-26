@@ -198,6 +198,19 @@ impl RomajiConverter {
         let mut result = String::new();
 
         while !self.buffer.is_empty() {
+            // Handle "n" followed by non-vowel/non-y or at end of buffer → "ん"
+            if self.buffer.starts_with('n') {
+                let next = self.buffer.chars().nth(1);
+                if next.is_none()
+                    || !matches!(next.unwrap(), 'a' | 'i' | 'u' | 'e' | 'o' | 'y' | 'n' | '\'')
+                {
+                    result.push('\u{3093}');
+                    self.output.push('\u{3093}');
+                    self.buffer.drain(..'n'.len_utf8());
+                    continue;
+                }
+            }
+
             let search = self.trie.search_longest(&self.buffer);
 
             if let Some(h) = search.output {

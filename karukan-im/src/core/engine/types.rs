@@ -81,6 +81,8 @@ pub struct EngineConfig {
     pub max_latency_ms: u64,
     /// Conversion strategy mode (adaptive, light, main)
     pub strategy: StrategyMode,
+    /// Show auto-suggest candidates while typing (false = show only on Space conversion)
+    pub auto_suggest: bool,
 }
 
 impl Default for EngineConfig {
@@ -93,6 +95,7 @@ impl Default for EngineConfig {
             beam_width: 3,
             max_latency_ms: 100,
             strategy: StrategyMode::default(),
+            auto_suggest: true,
         }
     }
 }

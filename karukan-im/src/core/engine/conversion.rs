@@ -168,7 +168,19 @@ impl InputMethodEngine {
         // Flush any remaining romaji into composed_hiragana
         self.flush_romaji_to_composed();
 
-        let reading = self.input_buf.text.clone();
+        let full_text = self.input_buf.text.clone();
+        let cursor = self.input_buf.cursor_pos;
+        let text_len = full_text.chars().count();
+
+        // Partial conversion: if cursor is not at the end, split at cursor
+        let (reading, remaining) = if cursor > 0 && cursor < text_len {
+            let before: String = full_text.chars().take(cursor).collect();
+            let after: String = full_text.chars().skip(cursor).collect();
+            (before, Some(after))
+        } else {
+            (full_text, None)
+        };
+        self.remaining_after_conversion = remaining;
 
         // Save auto-suggest/live conversion result before clearing state.
         // This ensures the candidate that was displayed during input is preserved
@@ -540,6 +552,30 @@ impl InputMethodEngine {
             self.record_learning(reading, &text);
         }
 
+        // Check for remaining text from partial conversion
+        let remaining = self.remaining_after_conversion.take();
+
+        if let Some(remaining) = remaining {
+            // Partial conversion: commit converted part, return remaining to composing
+            self.input_buf.text = remaining;
+            self.input_buf.cursor_pos = self.input_buf.text.chars().count();
+            self.converters.romaji.reset();
+            self.live.text.clear();
+            let preedit = self.set_composing_state();
+
+            let mut result = EngineResult::consumed()
+                .with_action(EngineAction::Commit(text))
+                .with_action(EngineAction::UpdatePreedit(preedit))
+                .with_action(EngineAction::HideCandidates);
+            if self.config.auto_suggest {
+                result =
+                    result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+            } else {
+                result = result.with_action(EngineAction::HideAuxText);
+            }
+            return result;
+        }
+
         self.state = InputState::Empty;
         self.input_buf.text.clear();
 
@@ -560,6 +596,7 @@ impl InputMethodEngine {
             self.record_learning(reading, &text);
         }
 
+        self.remaining_after_conversion = None;
         self.state = InputState::Empty;
         self.input_buf.text.clear();
 
@@ -579,7 +616,9 @@ impl InputMethodEngine {
         if !matches!(self.state, InputState::Conversion { .. }) {
             return EngineResult::not_consumed();
         }
-        let reading = self.input_buf.text.clone();
+        // Restore remaining text from partial conversion
+        let remaining = self.remaining_after_conversion.take().unwrap_or_default();
+        let reading = format!("{}{}", self.input_buf.text, remaining);
 
         if reading.is_empty() {
             self.state = InputState::Empty;
@@ -665,6 +704,28 @@ impl InputMethodEngine {
         }
 
         // Commit immediately after digit selection
+        let remaining = self.remaining_after_conversion.take();
+
+        if let Some(remaining) = remaining {
+            // Partial conversion: return remaining to composing
+            self.input_buf.text = remaining;
+            self.input_buf.cursor_pos = self.input_buf.text.chars().count();
+            self.converters.romaji.reset();
+            self.live.text.clear();
+            let preedit = self.set_composing_state();
+
+            let mut result = EngineResult::consumed()
+                .with_action(EngineAction::Commit(selected_text))
+                .with_action(EngineAction::UpdatePreedit(preedit))
+                .with_action(EngineAction::HideCandidates);
+            if self.config.auto_suggest {
+                result =
+                    result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+            } else {
+                result = result.with_action(EngineAction::HideAuxText);
+            }
+            return result;
+        }
 
         self.state = InputState::Empty;
 

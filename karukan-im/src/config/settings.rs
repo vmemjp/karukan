@@ -63,6 +63,13 @@ pub struct ConversionSettings {
     pub max_latency_ms: u64,
     /// Number of threads for llama.cpp inference (0 = all cores, llama.cpp default)
     pub n_threads: u32,
+    /// Show auto-suggest candidates while typing (false = show only on Space conversion)
+    #[serde(default = "default_true")]
+    pub auto_suggest: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Learning cache settings
