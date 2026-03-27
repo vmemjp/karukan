@@ -6,19 +6,20 @@ use super::*;
 fn test_mode_toggle_key_switches_alphabet_to_hiragana() {
     let mut engine = InputMethodEngine::new();
 
-    // Enter alphabet mode via Shift+A
+    // Enter alphabet mode via Shift+A and stay in composing (don't commit)
     engine.process_key(&press_shift('A'));
+    engine.process_key(&press('b'));
     assert!(engine.input_mode == InputMode::Alphabet);
-    engine.process_key(&press_key(Keysym::RETURN)); // commit to clear state
 
-    // Alt_R press → switch to hiragana mode
+    // Alt_R press → switch to hiragana mode (during composing)
     let result = engine.process_key(&press_key(Keysym::ALT_R));
     assert!(result.consumed);
     assert!(engine.input_mode != InputMode::Alphabet);
 
-    // Type 'a' → should be 'あ' (hiragana mode)
+    // Continue typing → hiragana
     engine.process_key(&press('a'));
-    assert_eq!(engine.preedit().unwrap().text(), "あ");
+    // 'a' goes through romaji → 'あ', preedit is "Ab" (flushed) + "あ"
+    assert_eq!(engine.preedit().unwrap().text(), "Abあ");
 }
 
 #[test]

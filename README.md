@@ -54,9 +54,9 @@ Space変換時に末尾の `n` を自動的に「ん」に変換します。`nn`
 - 対象: `karukan-engine/src/romaji/converter.rs`
 
 #### 2. Shift英字入力後のモード自動復帰
-Shift+英字でアルファベットを入力した後、確定してEmpty状態に戻ると自動的にひらがなモードに復帰します。
+Shift+英字でアルファベットモードに入り、以降の入力はShiftなしでもアルファベットとして扱われます（例: Shift+L → i → n → u → x で「Linux」）。確定（Enter）やキャンセル（Escape）でEmpty状態に戻ると自動的にひらがなモードに復帰します。
 
-- 対象: `karukan-im/src/core/engine/input.rs`
+- 対象: `karukan-im/src/core/engine/input.rs`, `mod.rs`
 
 #### 3. Shift+矢印キーによる選択ベース部分変換
 Composing状態でShift+矢印キーを使って選択範囲を作り、Spaceを押すと選択部分のみを変換します。選択前のテキストはそのまま確定され、選択後のテキストはComposing状態に残ります。選択なしでSpaceを押すとテキスト全体を変換します（従来のカーソル位置分割は廃止）。

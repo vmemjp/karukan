@@ -52,20 +52,20 @@ fn test_alphabet_mode_space_inserts_literal_space() {
     engine.process_key(&press_shift('N'));
     assert!(engine.input_mode == InputMode::Alphabet);
 
-    // Use all Shift chars to stay in alphabet mode
-    engine.process_key(&press_shift('E'));
-    engine.process_key(&press_shift('W'));
-    assert_eq!(engine.preedit().unwrap().text(), "NEW");
+    // Type "ew" (no shift needed, alphabet mode persists)
+    engine.process_key(&press('e'));
+    engine.process_key(&press('w'));
+    assert_eq!(engine.preedit().unwrap().text(), "New");
 
     // Space → should insert literal space, NOT start conversion
     engine.process_key(&press_key(Keysym::SPACE));
     assert!(matches!(engine.state(), InputState::Composing { .. }));
-    assert_eq!(engine.preedit().unwrap().text(), "NEW ");
+    assert_eq!(engine.preedit().unwrap().text(), "New ");
 
-    // Type "YORK" with Shift to stay in alphabet mode
-    engine.process_key(&press_shift('Y'));
-    engine.process_key(&press_shift('O'));
-    engine.process_key(&press_shift('R'));
-    engine.process_key(&press_shift('K'));
-    assert_eq!(engine.preedit().unwrap().text(), "NEW YORK");
+    // Type "york" (alphabet mode persists)
+    engine.process_key(&press('y'));
+    engine.process_key(&press('o'));
+    engine.process_key(&press('r'));
+    engine.process_key(&press('k'));
+    assert_eq!(engine.preedit().unwrap().text(), "New york");
 }

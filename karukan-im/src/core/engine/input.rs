@@ -143,8 +143,6 @@ impl InputMethodEngine {
 
             if is_shift_alpha && self.input_mode != InputMode::Alphabet {
                 self.input_mode = InputMode::Alphabet;
-            } else if !is_shift_alpha && self.input_mode == InputMode::Alphabet {
-                self.input_mode = InputMode::Hiragana;
             }
             let ch = if self.input_mode == InputMode::Alphabet && is_shift_alpha {
                 ch.to_ascii_uppercase()
@@ -281,10 +279,6 @@ impl InputMethodEngine {
                         self.input_mode = InputMode::Alphabet;
                         self.flush_romaji_to_composed();
                         self.live.text.clear();
-                    } else if !is_shift_alpha && self.input_mode == InputMode::Alphabet {
-                        // Return to Hiragana when non-shift char typed in Alphabet mode
-                        self.input_mode = InputMode::Hiragana;
-                        self.flush_romaji_to_composed();
                     }
                     let ch = if self.input_mode == InputMode::Alphabet && is_shift_alpha {
                         ch.to_ascii_uppercase()

@@ -236,6 +236,9 @@ impl InputMethodEngine {
         self.live.text.clear();
         self.remaining_after_conversion = None;
         self.conversion_space_count = 0;
+        // Revert to hiragana on Empty transition so that the next input
+        // session starts in hiragana mode (Shift+letter can re-enter alphabet).
+        self.input_mode = InputMode::Hiragana;
     }
 
     /// If the display is empty, reset to Empty state and return the result.
