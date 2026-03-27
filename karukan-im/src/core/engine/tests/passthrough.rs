@@ -116,3 +116,54 @@ fn test_digit_in_middle_of_hiragana() {
     assert!(matches!(engine.state(), InputState::Composing { .. }));
     assert_eq!(engine.preedit().unwrap().text(), "あ2");
 }
+
+#[test]
+fn test_backspace_reclaims_passthrough_for_romaji() {
+    // Typing "hs" passes 'h' through, then backspacing 's' should reclaim 'h'
+    // into the romaji buffer so that typing 'a' produces "は", not "hあ".
+    let mut engine = InputMethodEngine::new();
+
+    // Type 'h' → buffered
+    engine.process_key(&press('h'));
+    assert_eq!(engine.preedit().unwrap().text(), "h");
+
+    // Type 's' → 'h' passes through (no "hs" rule), 's' buffered
+    engine.process_key(&press('s'));
+    assert_eq!(engine.preedit().unwrap().text(), "hs");
+
+    // Backspace → remove 's', reclaim 'h' back to buffer
+    engine.process_key(&press_key(Keysym::BACKSPACE));
+    assert_eq!(engine.preedit().unwrap().text(), "h");
+
+    // Type 'a' → 'h' + 'a' = "は"
+    engine.process_key(&press('a'));
+    assert_eq!(
+        engine.preedit().unwrap().text(),
+        "は",
+        "Should produce は, not hあ"
+    );
+}
+
+#[test]
+fn test_backspace_reclaim_with_preceding_hiragana() {
+    // Same scenario but with hiragana already in the buffer
+    let mut engine = InputMethodEngine::new();
+
+    // Type "ka" → "か"
+    engine.process_key(&press('k'));
+    engine.process_key(&press('a'));
+    assert_eq!(engine.preedit().unwrap().text(), "か");
+
+    // Type "hs" → "かhs" (h passed through, s buffered)
+    engine.process_key(&press('h'));
+    engine.process_key(&press('s'));
+    assert_eq!(engine.preedit().unwrap().text(), "かhs");
+
+    // Backspace → "かh" (s removed, h reclaimed)
+    engine.process_key(&press_key(Keysym::BACKSPACE));
+    assert_eq!(engine.preedit().unwrap().text(), "かh");
+
+    // Type 'a' → "かは"
+    engine.process_key(&press('a'));
+    assert_eq!(engine.preedit().unwrap().text(), "かは");
+}

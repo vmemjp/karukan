@@ -131,6 +131,11 @@ fcitx5がアプリ側のイベント等で `reset()` を呼んだ際、従来は
 
 - 対象: `karukan-im/src/core/engine/tests/alphabet.rs`, `conversion.rs`, `katakana.rs`, `mode_toggle.rs`, `passthrough.rs`, `karukan-im/src/ffi/tests.rs`
 
+#### 11. Backspace後のローマ字再結合
+ローマ字入力中に誤打した文字をBackspaceで削除した後、正しい文字を入力しても変換が効かない問題を修正しました。例えば「は」を入力するつもりで `hs` と打ち、`s` を削除して `a` を入力すると、従来は「hあ」になっていました。これはBackspaceでバッファから文字を削除した際、直前にパススルーされた子音（`h`）が確定済みのoutputに残ったままになるためです。バッファが空になった時点でoutput末尾の文字がローマ字の先頭になりうる場合（trieに子ノードがある場合）、バッファに戻す（reclaim）ようにしました。
+
+- 対象: `karukan-engine/src/romaji/converter.rs`, `karukan-im/src/core/engine/cursor.rs`
+
 ### 辞書の拡張
 
 jawiki（Wikipedia固有名詞）のシステム辞書統合や、顔文字・絵文字辞書の導入手順については [辞書セットアップガイド](docs/dictionary-setup.md) を参照してください。

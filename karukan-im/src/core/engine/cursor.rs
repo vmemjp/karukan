@@ -43,7 +43,16 @@ impl InputMethodEngine {
     pub(super) fn backspace_composing(&mut self) -> EngineResult {
         // If romaji buffer is not empty, backspace from buffer (not from composed text)
         if !self.converters.romaji.buffer().is_empty() {
+            let output_len_before = self.converters.romaji.output().chars().count();
             self.converters.romaji.backspace();
+            let output_len_after = self.converters.romaji.output().chars().count();
+
+            // If output shrank, a passthrough char was reclaimed into the buffer.
+            // Remove it from input_buf too so it doesn't appear twice.
+            if output_len_after < output_len_before && self.input_buf.cursor_pos > 0 {
+                self.input_buf.remove_char_before_cursor();
+            }
+
             if let Some(result) = self.try_reset_if_empty() {
                 return result;
             }

@@ -239,6 +239,21 @@ impl RomajiConverter {
     /// Handle backspace
     pub fn backspace(&mut self) -> BackspaceResult {
         if let Some(ch) = self.buffer.pop() {
+            // After removing from buffer, if buffer is now empty and the last
+            // output char could start a romaji sequence (has children in the trie),
+            // reclaim it into the buffer so it can combine with the next keystroke.
+            // Example: "hs" → backspace 's' → reclaim 'h' into buffer, so typing
+            // 'a' next produces 'は' instead of 'hあ'.
+            if self.buffer.is_empty() {
+                if let Some(&last_out) = self.output.as_bytes().last() {
+                    let last_char = last_out as char;
+                    if last_char.is_ascii_lowercase() && self.trie.children.contains_key(&last_char)
+                    {
+                        self.output.pop();
+                        self.buffer.push(last_char);
+                    }
+                }
+            }
             BackspaceResult::RemovedBuffer(ch)
         } else if let Some(ch) = self.output.pop() {
             BackspaceResult::RemovedOutput(ch)

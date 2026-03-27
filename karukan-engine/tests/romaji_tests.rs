@@ -709,7 +709,8 @@ fn test_real_words() {
     });
     assert_eq!(conv.output(), "あんにんどうふ"); // "annin doufu" - almond jelly
 
-    // "karukan" (single n at end) -> "かるかn" after flush
+    // "karukan" (single n at end) -> "かるかん" after flush
+    // (Fork change: trailing 'n' is converted to 'ん' on flush)
     conv.reset();
     "karukan".chars().for_each(|c| {
         conv.push(c);
@@ -717,7 +718,7 @@ fn test_real_words() {
     assert_eq!(conv.output(), "かるか");
     assert_eq!(conv.buffer(), "n"); // Trailing 'n' buffered (ambiguous)
     conv.flush();
-    assert_eq!(conv.output(), "かるかn"); // Ambiguous 'n' outputs as-is
+    assert_eq!(conv.output(), "かるかん"); // Trailing 'n' → 'ん' on flush
 
     // "karukann" (nn at end) -> "かるかん" immediately (nn converts right away)
     conv.reset();
