@@ -376,19 +376,14 @@ impl InputMethodEngine {
         };
 
         if text.is_empty() {
-            self.state = InputState::Empty;
-            self.input_buf.clear();
-            self.live.text.clear();
+            self.enter_empty_state();
             return EngineResult::consumed().with_action(EngineAction::HideAuxText);
         }
 
         // Record live conversion result in learning cache
         self.record_learning(&reading, &text);
 
-        self.converters.romaji.reset();
-        self.input_buf.clear();
-        self.live.text.clear();
-        self.state = InputState::Empty;
+        self.enter_empty_state();
 
         EngineResult::consumed()
             .with_action(EngineAction::UpdatePreedit(Preedit::new()))
@@ -410,10 +405,7 @@ impl InputMethodEngine {
                 .with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
         }
 
-        self.converters.romaji.reset();
-        self.input_buf.clear();
-        self.live.text.clear();
-        self.state = InputState::Empty;
+        self.enter_empty_state();
 
         EngineResult::consumed()
             .with_action(EngineAction::UpdatePreedit(Preedit::new()))

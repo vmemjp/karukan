@@ -158,11 +158,11 @@ fn test_alphabet_mode_uppercase_with_shift() {
     engine.process_key(&press_shift('A'));
     assert!(engine.input_mode == InputMode::Alphabet);
 
-    // Type lowercase 'a' → should be 'a'
+    // Type lowercase 'a' → reverts to hiragana, 'a' becomes 'あ'
     engine.process_key(&press('a'));
-    assert_eq!(engine.preedit().unwrap().text(), "Aa");
+    assert_eq!(engine.preedit().unwrap().text(), "Aあ");
 
-    // Shift+a → uppercase 'A' (still in alphabet mode)
+    // Shift+a → re-enters alphabet mode, uppercase 'A'
     let event = KeyEvent::new(
         Keysym(0x0061), // lowercase keysym
         KeyModifiers::new().with_shift(true),
@@ -170,7 +170,7 @@ fn test_alphabet_mode_uppercase_with_shift() {
     );
     engine.process_key(&event);
     assert!(engine.input_mode == InputMode::Alphabet);
-    assert_eq!(engine.preedit().unwrap().text(), "AaA");
+    assert_eq!(engine.preedit().unwrap().text(), "AあA");
 }
 
 #[test]
@@ -219,12 +219,12 @@ fn test_mixed_hiragana_alphabet_input() {
     assert!(engine.input_mode == InputMode::Alphabet);
     assert_eq!(engine.preedit().unwrap().text(), "わたしはL");
 
-    // Continue typing in alphabet mode (without shift → lowercase)
+    // Non-shift chars revert to hiragana: 'i'→'い', 'n'+'u'→'ぬ', 'x'→passthrough
     engine.process_key(&press('i'));
     engine.process_key(&press('n'));
     engine.process_key(&press('u'));
     engine.process_key(&press('x'));
-    assert_eq!(engine.preedit().unwrap().text(), "わたしはLinux");
+    assert_eq!(engine.preedit().unwrap().text(), "わたしはLいぬx");
 }
 
 #[test]
@@ -235,15 +235,16 @@ fn test_alphabet_mode_persists_across_commit() {
     engine.process_key(&press_shift('H'));
     assert!(engine.input_mode == InputMode::Alphabet);
 
-    // Type and commit
+    // Type 'i' (non-shift) → reverts to hiragana, 'i' → 'い'
     engine.process_key(&press('i'));
+    // Commit "Hい"
     engine.process_key(&press_key(Keysym::RETURN));
     assert!(matches!(engine.state(), InputState::Empty));
 
-    // alphabet_mode should persist
-    assert!(engine.input_mode == InputMode::Alphabet);
+    // Mode was reverted to hiragana when 'i' was typed
+    assert!(engine.input_mode != InputMode::Alphabet);
 
-    // New input should still be in alphabet mode
+    // New input in hiragana mode: 'y' is buffered by romaji
     engine.process_key(&press('y'));
     assert_eq!(engine.preedit().unwrap().text(), "y");
 }
@@ -252,14 +253,14 @@ fn test_alphabet_mode_persists_across_commit() {
 fn test_alphabet_mode_cancel_clears_flags() {
     let mut engine = InputMethodEngine::new();
 
-    // Enter alphabet mode via Shift+A, type, cancel
+    // Enter alphabet mode via Shift+A, type 'b' (non-shift reverts to hiragana)
     engine.process_key(&press_shift('A'));
     engine.process_key(&press('b'));
 
     engine.process_key(&press_key(Keysym::ESCAPE));
     assert!(matches!(engine.state(), InputState::Empty));
-    // Mode persists even after cancel
-    assert!(engine.input_mode == InputMode::Alphabet);
+    // Mode was reverted to hiragana when 'b' was typed (non-shift)
+    assert!(engine.input_mode != InputMode::Alphabet);
 }
 
 #[test]

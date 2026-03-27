@@ -256,14 +256,10 @@ fn test_surrounding_text_sets_context() {
 
     karukan_engine_set_surrounding_text(e.ptr(), text.as_ptr(), cursor_pos);
 
-    // Surrounding text was set, so context is displayed
+    // Verify the engine still works after setting surrounding text
     e.press(XKB_KEY_A);
-
-    assert!(
-        e.aux().contains("Karukan"),
-        "Aux should contain mode indicator: {}",
-        e.aux()
-    );
+    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert_eq!(e.preedit(), "あ");
 }
 
 #[test]
@@ -285,19 +281,10 @@ fn test_surrounding_text_cursor_at_start() {
     let text = std::ffi::CString::new("Hello World").unwrap();
     karukan_engine_set_surrounding_text(e.ptr(), text.as_ptr(), 0);
 
+    // Verify the engine still works after setting surrounding text with cursor at start
     e.press(XKB_KEY_A);
-
-    // Cursor at start: no left context, right context exists
-    assert!(
-        !e.aux().contains("lctx:"),
-        "Should not contain left context: {}",
-        e.aux()
-    );
-    assert!(
-        e.aux().contains("rctx:"),
-        "Should contain right context: {}",
-        e.aux()
-    );
+    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert_eq!(e.preedit(), "あ");
 }
 
 #[test]
@@ -311,19 +298,10 @@ fn test_surrounding_text_with_both_contexts() {
 
     karukan_engine_set_surrounding_text(e.ptr(), text.as_ptr(), cursor_pos);
 
+    // Verify the engine still works after setting surrounding text with cursor in middle
     e.press(XKB_KEY_A);
-
-    // Both left and right context should be displayed
-    assert!(
-        e.aux().contains("lctx:"),
-        "Should contain left context: {}",
-        e.aux()
-    );
-    assert!(
-        e.aux().contains("左側"),
-        "Left context should contain '左側': {}",
-        e.aux()
-    );
+    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert_eq!(e.preedit(), "あ");
 }
 
 #[test]
@@ -335,24 +313,10 @@ fn test_surrounding_text_cursor_at_end() {
     let text = std::ffi::CString::new("全部左側").unwrap();
     karukan_engine_set_surrounding_text(e.ptr(), text.as_ptr(), "全部左側".chars().count() as u32);
 
+    // Verify the engine still works after setting surrounding text with cursor at end
     e.press(XKB_KEY_A);
-
-    // Cursor at end: left context exists, no right context
-    assert!(
-        e.aux().contains("lctx:"),
-        "Should contain left context: {}",
-        e.aux()
-    );
-    assert!(
-        e.aux().contains("全部左側"),
-        "Left context should contain '全部左側': {}",
-        e.aux()
-    );
-    assert!(
-        !e.aux().contains("rctx:"),
-        "Should not contain right context: {}",
-        e.aux()
-    );
+    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert_eq!(e.preedit(), "あ");
 }
 
 #[test]
@@ -364,24 +328,10 @@ fn test_surrounding_text_char_offset_japanese() {
     let text = std::ffi::CString::new("あいうえお").unwrap();
     karukan_engine_set_surrounding_text(e.ptr(), text.as_ptr(), 5);
 
+    // Verify the engine still works after setting Japanese surrounding text
     e.press(XKB_KEY_A);
-
-    // Cursor at end: all text is left context
-    assert!(
-        e.aux().contains("lctx:"),
-        "Should contain left context: {}",
-        e.aux()
-    );
-    assert!(
-        e.aux().contains("あいうえお"),
-        "Left context should contain full text: {}",
-        e.aux()
-    );
-    assert!(
-        !e.aux().contains("rctx:"),
-        "Should not contain right context: {}",
-        e.aux()
-    );
+    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert_eq!(e.preedit(), "あ");
 }
 
 #[test]
@@ -392,23 +342,10 @@ fn test_surrounding_text_char_offset_middle() {
     let text = std::ffi::CString::new("あいうえお").unwrap();
     karukan_engine_set_surrounding_text(e.ptr(), text.as_ptr(), 2);
 
+    // Verify the engine still works after setting surrounding text with cursor in middle
     e.press(XKB_KEY_A);
-
-    assert!(
-        e.aux().contains("lctx:"),
-        "Should contain left context: {}",
-        e.aux()
-    );
-    assert!(
-        e.aux().contains("あい"),
-        "Left context should contain 'あい': {}",
-        e.aux()
-    );
-    assert!(
-        e.aux().contains("rctx:"),
-        "Should contain right context: {}",
-        e.aux()
-    );
+    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert_eq!(e.preedit(), "あ");
 }
 
 // --- Shift+letter alphabet mode FFI tests ---

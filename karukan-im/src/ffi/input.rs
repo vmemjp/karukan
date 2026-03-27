@@ -30,15 +30,29 @@ pub extern "C" fn karukan_engine_process_key(
     if result.consumed { 1 } else { 0 }
 }
 
-/// Reset the engine state
+/// Reset the engine state.
+///
+/// If the engine is in Conversion state, the selected candidate is preserved
+/// in the commit cache so the caller can commit it before clearing the UI.
+/// Composing text is discarded (the user hasn't initiated conversion yet).
 #[unsafe(no_mangle)]
 pub extern "C" fn karukan_engine_reset(engine: *mut KarukanEngine) {
     let engine = ffi_mut!(engine);
+
+    // Salvage conversion text before reset clears everything.
+    let conversion_text = engine.engine.commit_if_converting();
+
     engine.engine.reset();
     engine.preedit = super::PreeditCache::default();
     engine.candidates = super::CandidateCache::default();
-    engine.commit = super::CommitCache::default();
     engine.aux = super::AuxCache::default();
+
+    if let Some(text) = conversion_text {
+        engine.commit.text = std::ffi::CString::new(text).unwrap_or_default();
+        engine.commit.dirty = true;
+    } else {
+        engine.commit = super::CommitCache::default();
+    }
 }
 
 /// Set the surrounding text context from the editor

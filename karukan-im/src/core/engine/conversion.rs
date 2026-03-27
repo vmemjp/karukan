@@ -427,6 +427,11 @@ impl InputMethodEngine {
         builder.push_if_new(hiragana, CandidateSource::Fallback, None);
         builder.push_if_new(katakana, CandidateSource::Fallback, None);
 
+        // 5. Kanji numeral fallback (e.g. "312" → "三一二")
+        if let Some(kanji_num) = karukan_engine::digits_to_kanji(reading) {
+            builder.push_if_new(kanji_num, CandidateSource::Fallback, None);
+        }
+
         builder.into_candidates()
     }
 
@@ -651,8 +656,7 @@ impl InputMethodEngine {
             return result;
         }
 
-        self.state = InputState::Empty;
-        self.input_buf.text.clear();
+        self.enter_empty_state();
 
         EngineResult::consumed()
             .with_action(EngineAction::UpdatePreedit(Preedit::new()))
@@ -678,9 +682,7 @@ impl InputMethodEngine {
             text
         };
 
-        self.conversion_space_count = 0;
-        self.state = InputState::Empty;
-        self.input_buf.text.clear();
+        self.enter_empty_state();
 
         // Start new input with the character
         let new_input_result = self.start_input(ch);
@@ -707,8 +709,7 @@ impl InputMethodEngine {
         };
 
         if reading.is_empty() {
-            self.state = InputState::Empty;
-            self.input_buf.clear();
+            self.enter_empty_state();
             return EngineResult::consumed()
                 .with_action(EngineAction::UpdatePreedit(Preedit::new()))
                 .with_action(EngineAction::HideCandidates)
@@ -826,7 +827,7 @@ impl InputMethodEngine {
             return result;
         }
 
-        self.state = InputState::Empty;
+        self.enter_empty_state();
 
         EngineResult::consumed()
             .with_action(EngineAction::UpdatePreedit(Preedit::new()))
@@ -944,11 +945,7 @@ impl InputMethodEngine {
 
     /// Commit text directly and reset state
     fn commit_direct(&mut self, text: String) -> EngineResult {
-        self.conversion_space_count = 0;
-        self.remaining_after_conversion = None;
-        self.state = InputState::Empty;
-        self.input_buf.text.clear();
-        self.converters.romaji.reset();
+        self.enter_empty_state();
 
         EngineResult::consumed()
             .with_action(EngineAction::UpdatePreedit(Preedit::new()))

@@ -201,12 +201,48 @@ impl InputMethodEngine {
         self.metrics = ConversionMetrics::default();
     }
 
+    /// If the engine is in Conversion state, extract the selected candidate
+    /// text for committing and transition to Empty. Returns `None` for
+    /// Empty/Composing states (those are simply discarded on reset).
+    pub fn commit_if_converting(&mut self) -> Option<String> {
+        if !matches!(self.state, InputState::Conversion { .. }) {
+            return None;
+        }
+        let text = match &self.state {
+            InputState::Conversion { candidates, .. } => {
+                let text = candidates.selected_text().unwrap_or("").to_string();
+                let reading = candidates.selected().and_then(|c| c.reading.clone());
+                if let Some(reading) = &reading {
+                    self.record_learning(reading, &text);
+                }
+                text
+            }
+            _ => unreachable!(),
+        };
+        if text.is_empty() {
+            return None;
+        }
+        Some(text)
+    }
+
+    /// Transition to Empty state with full cleanup.
+    ///
+    /// Resets all composing/conversion state so no stale data leaks into
+    /// the next input session. Called by every commit path that returns to Empty.
+    fn enter_empty_state(&mut self) {
+        self.state = InputState::Empty;
+        self.input_buf.clear();
+        self.converters.romaji.reset();
+        self.live.text.clear();
+        self.remaining_after_conversion = None;
+        self.conversion_space_count = 0;
+    }
+
     /// If the display is empty, reset to Empty state and return the result.
     /// Returns None if display is not empty (caller should continue normally).
     fn try_reset_if_empty(&mut self) -> Option<EngineResult> {
         if self.build_input_display().is_empty() {
-            self.state = InputState::Empty;
-            self.input_buf.clear();
+            self.enter_empty_state();
             Some(
                 EngineResult::consumed()
                     .with_action(EngineAction::UpdatePreedit(Preedit::new()))
@@ -402,8 +438,8 @@ impl InputMethodEngine {
 
     /// Commit any pending input and return the text
     pub fn commit(&mut self) -> String {
-        match &self.state {
-            InputState::Empty => String::new(),
+        let text = match &self.state {
+            InputState::Empty => return String::new(),
             InputState::Composing { .. } => {
                 // Flush romaji buffer into composed_hiragana
                 self.flush_romaji_to_composed();
@@ -415,11 +451,6 @@ impl InputMethodEngine {
                 };
                 // Record live conversion result in learning cache
                 self.record_learning(&reading, &text);
-                self.converters.romaji.reset();
-                self.input_buf.clear();
-                self.live.text.clear();
-                self.state = InputState::Empty;
-                self.surrounding_context = None;
                 text
             }
             InputState::Conversion { candidates, .. } => {
@@ -429,12 +460,12 @@ impl InputMethodEngine {
                 if let Some(reading) = &reading {
                     self.record_learning(reading, &text);
                 }
-                self.input_buf.clear();
-                self.state = InputState::Empty;
-                self.surrounding_context = None;
                 text
             }
-        }
+        };
+        self.enter_empty_state();
+        self.surrounding_context = None;
+        text
     }
 
     /// Save the learning cache to disk if it has unsaved changes.

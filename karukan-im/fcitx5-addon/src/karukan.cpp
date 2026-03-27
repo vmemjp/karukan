@@ -163,6 +163,16 @@ void KarukanState::keyEvent(KeyEvent& keyEvent) {
 void KarukanState::reset() {
     if (rustEngine_) {
         karukan_engine_reset(rustEngine_);
+
+        // If the engine was in Conversion state, reset() preserves the
+        // selected candidate in the commit cache. Flush it to the app
+        // so the user's conversion choice is not silently discarded.
+        if (karukan_engine_has_commit(rustEngine_)) {
+            const char* commitText = karukan_engine_get_commit(rustEngine_);
+            if (commitText && karukan_engine_get_commit_len(rustEngine_) > 0) {
+                ic_->commitString(commitText);
+            }
+        }
     }
 
     ic_->inputPanel().reset();

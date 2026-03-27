@@ -9,6 +9,7 @@ karukan-imの辞書を拡張するための辞書導入手順です。
 | システム辞書（SudachiDict） | 約266万    | 標準の漢字変換（プリインストール済み） |
 | jawiki辞書                  | 約71万     | Wikipedia由来の固有名詞・専門用語      |
 | 顔文字・絵文字辞書          | 約1.3万    | 顔文字・Unicode絵文字                  |
+| 記号辞書（Mozc symbol）     | 約4800     | 特殊記号・括弧・矢印・数学記号等       |
 
 ## 1. jawiki辞書のシステム辞書への統合
 
@@ -226,6 +227,75 @@ fcitx5 -r -d
 - 「えがお」→ `😀`
 - 「はーと」→ `❤`
 
+## 3. 記号辞書の導入
+
+Mozc由来の記号辞書（約4800エントリ）を導入し、三点リーダ（…）、各種括弧（【】『』〈〉等）、ダッシュ（—）、矢印（→←↑↓）、数学記号（×÷±≠）、米印（※）などをひらがな読みから変換できるようにします。
+
+### 3.1 ダウンロードと変換
+
+```bash
+# Mozc記号辞書のダウンロード
+curl -sL -o /tmp/mozc-symbol.tsv \
+  https://raw.githubusercontent.com/google/mozc/master/src/data/symbol/symbol.tsv
+
+# karukan用Mozc TSV形式に変換（ひらがな読みのみ抽出）
+python3 << 'EOF' > /tmp/symbol-dict.tsv
+import sys
+
+seen = set()
+count = 0
+
+def is_hiragana(s):
+    return all('\u3040' <= c <= '\u309f' or c == '\u30fc' for c in s) and len(s) > 0
+
+with open("/tmp/mozc-symbol.tsv", encoding="utf-8") as f:
+    for line in f:
+        line = line.rstrip("\n")
+        if not line or line.startswith("POS"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        char, readings_str, description = parts[1], parts[2], parts[3]
+        if not char or not readings_str:
+            continue
+        for reading in readings_str.split():
+            reading = reading.strip()
+            if not is_hiragana(reading):
+                continue
+            if (reading, char) in seen:
+                continue
+            seen.add((reading, char))
+            print(f"{reading}\t{char}\t記号\t{description}")
+            count += 1
+
+print(f"# Total: {count} entries", file=sys.stderr)
+EOF
+```
+
+### 3.2 ユーザー辞書として配置
+
+```bash
+mkdir -p ~/.local/share/karukan-im/user_dicts
+cp /tmp/symbol-dict.tsv ~/.local/share/karukan-im/user_dicts/
+```
+
+### 3.3 確認
+
+fcitx5を再起動して動作を確認します。
+
+```bash
+fcitx5 -r -d
+```
+
+テスト入力例:
+
+- 「さんてんりーだ」→ `…`
+- 「かっこ」→ `【】`「」『』〈〉
+- 「やじるし」→ `→` `←` `↑` `↓`
+- 「こめじるし」→ `※`
+- 「だっしゅ」→ `—`
+
 ## 辞書ソース
 
 | 辞書                 | ライセンス   | URL                                               |
@@ -235,3 +305,4 @@ fcitx5 -r -d
 | kaomoji-json         | -            | https://github.com/6/kaomoji-json                 |
 | tiwanari/emoticon    | MIT          | https://github.com/tiwanari/emoticon              |
 | Mozc emoticon.tsv    | BSD-3-Clause | https://github.com/google/mozc                    |
+| Mozc symbol.tsv      | BSD-3-Clause | https://github.com/google/mozc                    |

@@ -147,6 +147,33 @@ pub fn ascii_to_fullwidth(text: &str) -> String {
         .collect()
 }
 
+/// Convert ASCII digits in text to kanji numerals (一桁ずつ置換).
+///
+/// Only digits are converted; non-digit characters pass through unchanged.
+/// Example: "312" → "三一二", "20世紀" → "二〇世紀"
+pub fn digits_to_kanji(text: &str) -> Option<String> {
+    if !text.chars().any(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    Some(
+        text.chars()
+            .map(|c| match c {
+                '0' => '〇',
+                '1' => '一',
+                '2' => '二',
+                '3' => '三',
+                '4' => '四',
+                '5' => '五',
+                '6' => '六',
+                '7' => '七',
+                '8' => '八',
+                '9' => '九',
+                _ => c,
+            })
+            .collect(),
+    )
+}
+
 /// Convert katakana to hiragana
 pub fn katakana_to_hiragana(text: &str) -> String {
     text.chars()
@@ -188,6 +215,19 @@ mod tests {
         let katakana = hiragana_to_katakana(original);
         let back = katakana_to_hiragana(&katakana);
         assert_eq!(original, back);
+    }
+
+    #[test]
+    fn test_digits_to_kanji() {
+        assert_eq!(digits_to_kanji("312"), Some("三一二".to_string()));
+        assert_eq!(digits_to_kanji("2"), Some("二".to_string()));
+        assert_eq!(digits_to_kanji("0"), Some("〇".to_string()));
+        assert_eq!(
+            digits_to_kanji("20世紀"),
+            Some("二〇世紀".to_string())
+        );
+        assert_eq!(digits_to_kanji("あいう"), None);
+        assert_eq!(digits_to_kanji(""), None);
     }
 
     #[test]

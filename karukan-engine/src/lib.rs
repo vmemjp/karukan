@@ -6,7 +6,7 @@ pub mod romaji;
 
 pub use dict::{Candidate as DictCandidate, DictEntry, Dictionary, LookupResult};
 pub use kana::{
-    ascii_to_fullwidth, hiragana_to_halfwidth_katakana, hiragana_to_katakana,
+    ascii_to_fullwidth, digits_to_kanji, hiragana_to_halfwidth_katakana, hiragana_to_katakana,
     katakana_to_hiragana, normalize_nfkc,
 };
 pub use kanji::{Backend, KanaKanjiConverter};

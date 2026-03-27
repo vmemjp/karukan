@@ -111,6 +111,26 @@ show_aux_text = false
 | `candidate_window_threshold` | `3` | 候補ウインドウを表示するまでのSpace押下回数。0で常に表示 |
 | `show_aux_text` | `true` | 推論時間・辞書ソース等の補助テキストを表示する |
 
+#### 7. コミット時のステートクリーンアップ統一
+変換確定・キャンセル・直接変換など、Empty状態に遷移するすべてのパスで共通ヘルパー `enter_empty_state()` を使用するように統一しました。従来は一部のパスで `input_buf` のカーソル位置やセレクション、`live.text`、ローマ字コンバータの状態が適切にリセットされておらず、連続変換時に前回の状態が残留する可能性がありました。
+
+- 対象: `karukan-im/src/core/engine/mod.rs`, `conversion.rs`, `input.rs`
+
+#### 8. reset時のConversion状態コミット保護
+fcitx5がアプリ側のイベント等で `reset()` を呼んだ際、従来はComposing/Conversion状態を問わず変換中のテキストを破棄していました。これにより変換候補が確定されないまま消失し、直前にコミット済みの文字列が画面上に残ることで「前の変換結果が出力される」ように見えるバグが発生していました。Conversion状態（ユーザーが明示的にSpaceで変換を開始し候補を選択中）に限り、reset時に選択中の候補をアプリにコミットしてから状態をクリアするように変更しました。Composing状態（入力途中）は従来通り破棄します。
+
+- 対象: `karukan-im/src/core/engine/mod.rs`, `karukan-im/src/ffi/input.rs`, `karukan-im/fcitx5-addon/src/karukan.cpp`
+
+#### 9. アラビア数字→漢数字の変換候補生成
+変換候補のフォールバックとして、入力テキスト中のアラビア数字を一桁ずつ漢数字に置換した候補を自動生成します。「2」→「二」、「312」→「三一二」、「20世紀」→「二〇世紀」のように変換できます。
+
+- 対象: `karukan-engine/src/kana.rs`, `karukan-im/src/core/engine/conversion.rs`
+
+#### 10. テストの修正
+フォークによる動作変更（Shift英字後のモード自動復帰、記号の全角変換等）に合わせて、期待値がずれていた15件のテストを修正しました。アルファベットモードの復帰動作、`<`→`＜`の全角変換、モデル未ロード時のaux text空文字列などに対応しています。
+
+- 対象: `karukan-im/src/core/engine/tests/alphabet.rs`, `conversion.rs`, `katakana.rs`, `mode_toggle.rs`, `passthrough.rs`, `karukan-im/src/ffi/tests.rs`
+
 ### 辞書の拡張
 
 jawiki（Wikipedia固有名詞）のシステム辞書統合や、顔文字・絵文字辞書の導入手順については [辞書セットアップガイド](docs/dictionary-setup.md) を参照してください。

@@ -40,10 +40,10 @@ fn test_mode_toggle_key_noop_in_hiragana() {
 fn test_mode_toggle_key_during_alphabet_input() {
     let mut engine = InputMethodEngine::new();
 
-    // Enter alphabet mode via Shift+A and type "b"
+    // Enter alphabet mode via Shift+A and Shift+B (all shift to stay in alphabet)
     engine.process_key(&press_shift('A'));
-    engine.process_key(&press('b'));
-    assert_eq!(engine.preedit().unwrap().text(), "Ab");
+    engine.process_key(&press_shift('B'));
+    assert_eq!(engine.preedit().unwrap().text(), "AB");
     assert!(engine.input_mode == InputMode::Alphabet);
 
     // Alt_R → switch to hiragana
@@ -54,7 +54,7 @@ fn test_mode_toggle_key_during_alphabet_input() {
     // Continue typing → hiragana
     engine.process_key(&press('k'));
     engine.process_key(&press('a'));
-    assert_eq!(engine.preedit().unwrap().text(), "Abか");
+    assert_eq!(engine.preedit().unwrap().text(), "ABか");
 }
 
 #[test]

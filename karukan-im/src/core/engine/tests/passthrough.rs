@@ -2,26 +2,18 @@ use super::*;
 
 #[test]
 fn test_passthrough_no_double_counting() {
-    // Regression test: typing '<' twice should produce "<<", not "<<<".
-    // PassThrough chars are added to converter.output() AND returned as
-    // PassThrough events. Without proper handling, both paths insert the char.
+    // Regression test: typing '<' twice should produce "＜＜", not "＜＜＜".
+    // '<' is converted to full-width '＜' by romaji rules.
     let mut engine = InputMethodEngine::new();
 
-    // Type '<' (Shift+,) in empty state → should commit directly
-    let result = engine.process_key(&press('<'));
-    let has_commit = result
-        .actions
-        .iter()
-        .any(|a| matches!(a, EngineAction::Commit(text) if text == "<"));
-    assert!(has_commit, "First '<' should commit '<'");
+    // Type '<' in empty state → enters composing with "＜"
+    engine.process_key(&press('<'));
+    assert!(matches!(engine.state(), InputState::Composing { .. }));
+    assert_eq!(engine.preedit().unwrap().text(), "＜");
 
-    // Type '<' again in empty state → should commit directly again
-    let result = engine.process_key(&press('<'));
-    let has_commit = result
-        .actions
-        .iter()
-        .any(|a| matches!(a, EngineAction::Commit(text) if text == "<"));
-    assert!(has_commit, "Second '<' should commit '<'");
+    // Type '<' again → appends another "＜"
+    engine.process_key(&press('<'));
+    assert_eq!(engine.preedit().unwrap().text(), "＜＜");
 }
 
 #[test]
@@ -62,15 +54,15 @@ fn test_passthrough_after_hiragana_no_double() {
     engine.process_key(&press('a'));
     assert_eq!(engine.preedit().unwrap().text(), "あ");
 
-    // Type '<' while in hiragana input state
+    // Type '<' while in hiragana input state → converted to full-width '＜'
     engine.process_key(&press('<'));
     let preedit = engine.preedit().unwrap().text().to_string();
-    assert_eq!(preedit, "あ<", "Should be 'あ<', not 'あ<<'");
+    assert_eq!(preedit, "あ＜", "Should be 'あ＜', not 'あ＜＜'");
 
     // Type another '<'
     engine.process_key(&press('<'));
     let preedit = engine.preedit().unwrap().text().to_string();
-    assert_eq!(preedit, "あ<<", "Should be 'あ<<', not 'あ<<<'");
+    assert_eq!(preedit, "あ＜＜", "Should be 'あ＜＜', not 'あ＜＜＜'");
 }
 
 #[test]
