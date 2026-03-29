@@ -148,6 +148,7 @@ void KarukanState::keyEvent(KeyEvent& keyEvent) {
     }
 
     // Process key through Rust engine
+    handlingKeyEvent_ = true;
     int consumed = karukan_engine_process_key(rustEngine_, keysym, state, isRelease);
 
     if (consumed) {
@@ -158,9 +159,18 @@ void KarukanState::keyEvent(KeyEvent& keyEvent) {
     // change engine state and produce UI actions. The has_* flags in the
     // Rust engine guard against unnecessary updates.
     updateUI();
+    handlingKeyEvent_ = false;
 }
 
 void KarukanState::reset() {
+    // If reset() is called re-entrantly during key event processing
+    // (e.g. the application reacts to a preedit/candidate change by
+    // calling im_context_reset()), skip it — the key handler is already
+    // managing the engine state transition and will produce the correct UI.
+    if (handlingKeyEvent_) {
+        return;
+    }
+
     if (rustEngine_) {
         karukan_engine_reset(rustEngine_);
 
@@ -192,7 +202,8 @@ void KarukanState::updateUI() {
     // New preedit/candidates/aux are re-set below if the engine produced them.
     if (karukan_engine_has_commit(rustEngine_)) {
         const char* commitText = karukan_engine_get_commit(rustEngine_);
-        if (commitText && karukan_engine_get_commit_len(rustEngine_) > 0) {
+        uint32_t commitLen = karukan_engine_get_commit_len(rustEngine_);
+        if (commitText && commitLen > 0) {
             ic_->commitString(commitText);
         }
         inputPanel.reset();
@@ -302,9 +313,11 @@ void KarukanEngine::deactivate(const InputMethodEntry& entry, InputContextEvent&
     auto* state = ic->propertyFor(&factory_);
 
     // Commit any pending input on deactivation (mozc-style behavior)
-    // This ensures preedit is not lost when Super/Windows key is pressed
+    // Uses commit_for_deactivate which cancels conversion first — so
+    // pressing Esc (mapped as deactivation key) commits the original
+    // hiragana instead of a half-finished conversion result.
     if (state->rustEngine()) {
-        if (karukan_engine_commit(state->rustEngine())) {
+        if (karukan_engine_commit_for_deactivate(state->rustEngine())) {
             const char* commitText = karukan_engine_get_commit(state->rustEngine());
             if (commitText && karukan_engine_get_commit_len(state->rustEngine()) > 0) {
                 ic->commitString(commitText);

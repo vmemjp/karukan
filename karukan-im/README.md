@@ -116,6 +116,8 @@ I2026-02-24 22:57:54.252982 addonmanager.cpp:195] Loaded addon karukan
 | Delete | カーソル位置の文字を削除 |
 | ← → | カーソル移動 |
 | Home / End | カーソルを先頭 / 末尾に移動 |
+| Shift+← → | 選択範囲を1文字ずつ拡大/縮小 |
+| Shift+Home / End | 先頭/末尾まで一括選択 |
 | Ctrl+K | カタカナモードに切り替え |
 | Ctrl+Space | 全角スペースを入力 |
 
@@ -128,6 +130,8 @@ I2026-02-24 22:57:54.252982 addonmanager.cpp:195] Loaded addon karukan
 | 1-9 | 候補を番号で選択・確定 |
 | Enter | 選択中の候補を確定 |
 | Escape | 変換をキャンセル（ひらがなに戻る） |
+| Shift+← → | 変換キャンセル → Composingに戻り選択開始 |
+| Shift+Home / End | 変換キャンセル → Composingに戻り一括選択 |
 | 文字キー | 選択中の候補を確定して新しい入力を開始 |
 
 ### モード切り替え

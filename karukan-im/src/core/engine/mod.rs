@@ -106,12 +106,16 @@ pub struct InputMethodEngine {
     dicts: Dictionaries,
     /// Learning cache (user conversion history)
     learning: Option<LearningCache>,
-    /// Text remaining after partial conversion: `(before_selection, after_selection)`
+    /// Before/after text from selection-based partial conversion:
+    /// set in `start_conversion()`, consumed during commit or bake.
     remaining_after_conversion: Option<(String, String)>,
     /// Auto-suggest candidates stored during Composing state for Tab/Down selection
     suggest_candidates: Option<Vec<Candidate>>,
     /// Number of Space presses in current conversion session
     conversion_space_count: u32,
+    /// Original hiragana reading saved before the first partial conversion bake.
+    /// Used to record full-text learning when the user finally commits from Composing.
+    original_composing_text: Option<String>,
 }
 
 impl InputMethodEngine {
@@ -135,6 +139,7 @@ impl InputMethodEngine {
             remaining_after_conversion: None,
             suggest_candidates: None,
             conversion_space_count: 0,
+            original_composing_text: None,
         }
     }
 
@@ -190,12 +195,26 @@ impl InputMethodEngine {
         self.state.candidates()
     }
 
+    /// Get the composing text (input buffer contents).
+    ///
+    /// Returns the current text in the input buffer, which holds the full
+    /// hiragana text during Composing and Conversion states.
+    pub fn composing_text(&self) -> &str {
+        &self.input_buf.text
+    }
+
     /// Reset the engine state
     /// Note: surrounding_context is intentionally NOT cleared here.
     /// It is set once at activate() time and should persist through
     /// the session. fcitx5 may send reset events between activate
     /// and the first keyEvent, which would wipe the context.
     pub fn reset(&mut self) {
+        debug!(
+            "engine reset(): state={:?} input_buf=\"{}\" remaining={:?}",
+            std::mem::discriminant(&self.state),
+            self.input_buf.text,
+            self.remaining_after_conversion.is_some(),
+        );
         self.state = InputState::Empty;
         self.converters.romaji.reset();
         self.input_mode = InputMode::Hiragana;
@@ -207,6 +226,10 @@ impl InputMethodEngine {
     /// If the engine is in Conversion state, extract the selected candidate
     /// text for committing and transition to Empty. Returns `None` for
     /// Empty/Composing states (those are simply discarded on reset).
+    ///
+    /// For partial conversion (selection-based), the returned text includes
+    /// the before/after portions so that no text is lost when reset() is
+    /// called externally (e.g. by fcitx5 on focus change).
     pub fn commit_if_converting(&mut self) -> Option<String> {
         if !matches!(self.state, InputState::Conversion { .. }) {
             return None;
@@ -225,6 +248,12 @@ impl InputMethodEngine {
         if text.is_empty() {
             return None;
         }
+        // Include before/after text from partial conversion so nothing is lost.
+        let text = if let Some((before, after)) = self.remaining_after_conversion.take() {
+            format!("{}{}{}", before, text, after)
+        } else {
+            text
+        };
         Some(text)
     }
 
@@ -240,6 +269,7 @@ impl InputMethodEngine {
         self.remaining_after_conversion = None;
         self.suggest_candidates = None;
         self.conversion_space_count = 0;
+        self.original_composing_text = None;
         // Revert to hiragana on Empty transition so that the next input
         // session starts in hiragana mode (Shift+letter can re-enter alphabet).
         self.input_mode = InputMode::Hiragana;
@@ -405,8 +435,13 @@ impl InputMethodEngine {
             return EngineResult::not_consumed();
         }
 
-        // Only process key presses
+        // Only process key presses — but consume key releases for keys that
+        // were handled during Composing/Conversion to prevent them from reaching
+        // the application (which might trigger im_context_reset() on Esc release).
         if !key.is_press {
+            if !matches!(self.state, InputState::Empty) {
+                return EngineResult::consumed();
+            }
             return EngineResult::not_consumed();
         }
 
@@ -435,7 +470,7 @@ impl InputMethodEngine {
         let result = match &self.state {
             InputState::Empty => self.process_key_empty(key, shift_active),
             InputState::Composing { .. } => self.process_key_composing(key, shift_active),
-            InputState::Conversion { .. } => self.process_key_conversion(key),
+            InputState::Conversion { .. } => self.process_key_conversion(key, shift_active),
         };
 
         self.metrics.process_key_ms = start.elapsed().as_millis() as u64;
@@ -456,8 +491,9 @@ impl InputMethodEngine {
                 } else {
                     reading.clone()
                 };
-                // Record live conversion result in learning cache
-                self.record_learning(&reading, &text);
+                // Record learning: use original hiragana reading if baked
+                let learning_reading = self.original_composing_text.take().unwrap_or(reading);
+                self.record_learning(&learning_reading, &text);
                 text
             }
             InputState::Conversion { candidates, .. } => {
@@ -467,12 +503,48 @@ impl InputMethodEngine {
                 if let Some(reading) = &reading {
                     self.record_learning(reading, &text);
                 }
-                text
+                // Include before/after text from partial conversion so nothing is lost.
+                if let Some((before, after)) = self.remaining_after_conversion.take() {
+                    format!("{}{}{}", before, text, after)
+                } else {
+                    text
+                }
             }
         };
         self.enter_empty_state();
         self.surrounding_context = None;
         text
+    }
+
+    /// Commit for deactivation: cancels any pending conversion first, then
+    /// commits the full original text (hiragana).  This avoids committing a
+    /// half-finished conversion result when the IME is deactivated externally
+    /// (e.g. Esc mapped as deactivation key).
+    pub fn commit_for_deactivate(&mut self) -> String {
+        match &self.state {
+            InputState::Empty => String::new(),
+            InputState::Composing { .. } => self.commit(),
+            InputState::Conversion { .. } => {
+                // input_buf.text still holds the full original hiragana
+                // (start_conversion never modifies it).
+                let full_text = self.input_buf.text.clone();
+                let remaining = self.remaining_after_conversion.take();
+                // For partial conversion, input_buf has the full text already,
+                // so remaining is redundant — but verify consistency.
+                let text = if full_text.is_empty() {
+                    if let Some((before, after)) = remaining {
+                        format!("{}{}", before, after)
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    full_text
+                };
+                self.enter_empty_state();
+                self.surrounding_context = None;
+                text
+            }
+        }
     }
 
     /// Save the learning cache to disk if it has unsaved changes.

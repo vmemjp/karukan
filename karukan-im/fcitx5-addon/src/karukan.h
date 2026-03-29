@@ -60,6 +60,9 @@ private:
     InputContext* ic_;
     ::KarukanEngine* rustEngine_{nullptr};
     bool engineInitialized_{false};
+    /// Guard: true while inside keyEvent() to prevent re-entrant reset()
+    /// from losing engine state that the key handler is managing.
+    bool handlingKeyEvent_{false};
 };
 
 // Main engine class

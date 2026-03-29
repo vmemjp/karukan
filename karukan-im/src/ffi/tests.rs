@@ -198,13 +198,13 @@ fn test_reset() {
     e.press(XKB_KEY_A);
     assert!(e.preedit_len() > 0);
 
-    // Reset
+    // Reset — should salvage composing text as commit
     karukan_engine_reset(e.ptr());
 
-    // Everything should be cleared
+    // Preedit/candidates cleared, but composing text is salvaged as commit
     assert_eq!(e.preedit_len(), 0);
     assert!(!e.has_preedit());
-    assert!(!e.has_commit());
+    assert!(e.has_commit(), "Composing text should be salvaged on reset");
     assert!(!e.has_candidates());
 }
 
@@ -258,7 +258,10 @@ fn test_surrounding_text_sets_context() {
 
     // Verify the engine still works after setting surrounding text
     e.press(XKB_KEY_A);
-    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert!(
+        e.has_preedit(),
+        "Engine should have preedit after typing 'a'"
+    );
     assert_eq!(e.preedit(), "あ");
 }
 
@@ -283,7 +286,10 @@ fn test_surrounding_text_cursor_at_start() {
 
     // Verify the engine still works after setting surrounding text with cursor at start
     e.press(XKB_KEY_A);
-    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert!(
+        e.has_preedit(),
+        "Engine should have preedit after typing 'a'"
+    );
     assert_eq!(e.preedit(), "あ");
 }
 
@@ -300,7 +306,10 @@ fn test_surrounding_text_with_both_contexts() {
 
     // Verify the engine still works after setting surrounding text with cursor in middle
     e.press(XKB_KEY_A);
-    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert!(
+        e.has_preedit(),
+        "Engine should have preedit after typing 'a'"
+    );
     assert_eq!(e.preedit(), "あ");
 }
 
@@ -315,7 +324,10 @@ fn test_surrounding_text_cursor_at_end() {
 
     // Verify the engine still works after setting surrounding text with cursor at end
     e.press(XKB_KEY_A);
-    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert!(
+        e.has_preedit(),
+        "Engine should have preedit after typing 'a'"
+    );
     assert_eq!(e.preedit(), "あ");
 }
 
@@ -330,7 +342,10 @@ fn test_surrounding_text_char_offset_japanese() {
 
     // Verify the engine still works after setting Japanese surrounding text
     e.press(XKB_KEY_A);
-    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert!(
+        e.has_preedit(),
+        "Engine should have preedit after typing 'a'"
+    );
     assert_eq!(e.preedit(), "あ");
 }
 
@@ -344,7 +359,10 @@ fn test_surrounding_text_char_offset_middle() {
 
     // Verify the engine still works after setting surrounding text with cursor in middle
     e.press(XKB_KEY_A);
-    assert!(e.has_preedit(), "Engine should have preedit after typing 'a'");
+    assert!(
+        e.has_preedit(),
+        "Engine should have preedit after typing 'a'"
+    );
     assert_eq!(e.preedit(), "あ");
 }
 

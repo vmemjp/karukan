@@ -218,6 +218,14 @@ int karukan_engine_is_empty(const KarukanEngine* engine);
  */
 int karukan_engine_commit(KarukanEngine* engine);
 
+/*
+ * Commit for deactivation — if in Conversion state, cancels the conversion
+ * and commits the original hiragana text instead of the conversion result.
+ * For Composing state, behaves the same as karukan_engine_commit().
+ * Returns 1 if text was committed, 0 otherwise.
+ */
+int karukan_engine_commit_for_deactivate(KarukanEngine* engine);
+
 #ifdef __cplusplus
 }
 #endif

@@ -132,6 +132,8 @@ cargo clippy --workspace  # Lint all crates
 - RomajiConverter accumulates output; consumed into input_buf via delta tracking
 - Models use jinen format with special Unicode tokens (U+EE00–U+EE02) from the Private Use Area; model input is katakana (hiragana is converted to katakana before inference)
 - Model registry defined in `karukan-engine/models.toml`; default models use Q5_K_M quantization
+- Partial conversion uses a "bake" model: Shift+Arrow to select a portion → Space to convert → Enter bakes the result into the composing buffer (no immediate commit). The user can convert multiple portions in any order, then a final Enter in Composing commits the entire text. Full-text learning (`original_composing_text` → final result) is recorded at final commit.
+- Shift+Arrow works in both Composing and Conversion states. In Conversion, it cancels the conversion and returns to Composing with selection.
 - Learning cache records user-selected conversions and boosts them on subsequent conversions; candidate priority: Learning → User Dictionary → Model → System Dictionary → Fallback
 - Learning cache is persisted as TSV (`~/.local/share/karukan-im/learning.tsv`); saved on deactivate and engine free, not on every commit
 - Learning score uses recency-weighted formula (mozc-inspired): `recency * 10.0 + ln(1 + frequency)`; eviction removes lowest-score entries when over `max_entries` (default: 10,000)

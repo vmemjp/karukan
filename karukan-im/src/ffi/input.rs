@@ -32,22 +32,31 @@ pub extern "C" fn karukan_engine_process_key(
 
 /// Reset the engine state.
 ///
-/// If the engine is in Conversion state, the selected candidate is preserved
-/// in the commit cache so the caller can commit it before clearing the UI.
-/// Composing text is discarded (the user hasn't initiated conversion yet).
+/// Salvages pending text so the C++ caller can commit it before clearing
+/// the UI.  Handles both Conversion state (selected candidate) and
+/// Composing state (hiragana text — this covers the case where
+/// cancel_conversion already ran but fcitx5 still fires a reset).
 #[unsafe(no_mangle)]
 pub extern "C" fn karukan_engine_reset(engine: *mut KarukanEngine) {
     let engine = ffi_mut!(engine);
 
-    // Salvage conversion text before reset clears everything.
-    let conversion_text = engine.engine.commit_if_converting();
+    // Try to salvage text from Conversion first, then Composing.
+    let salvage_text = engine.engine.commit_if_converting().or_else(|| {
+        use crate::core::state::InputState;
+        if matches!(engine.engine.state(), InputState::Composing { .. }) {
+            let text = engine.engine.composing_text().to_string();
+            if text.is_empty() { None } else { Some(text) }
+        } else {
+            None
+        }
+    });
 
     engine.engine.reset();
     engine.preedit = super::PreeditCache::default();
     engine.candidates = super::CandidateCache::default();
     engine.aux = super::AuxCache::default();
 
-    if let Some(text) = conversion_text {
+    if let Some(text) = salvage_text {
         engine.commit.text = std::ffi::CString::new(text).unwrap_or_default();
         engine.commit.dirty = true;
     } else {

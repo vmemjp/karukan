@@ -128,8 +128,8 @@ impl InputMethodEngine {
             let mut result =
                 EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
             if self.config.auto_suggest {
-                result = result
-                    .with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+                result =
+                    result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
             } else {
                 result = result.with_action(EngineAction::HideAuxText);
             }
@@ -204,8 +204,7 @@ impl InputMethodEngine {
 
         let preedit = self.set_composing_state();
 
-        let mut result =
-            EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
+        let mut result = EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
         if self.config.auto_suggest {
             result = result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
         } else {
@@ -381,8 +380,10 @@ impl InputMethodEngine {
             return EngineResult::consumed().with_action(EngineAction::HideAuxText);
         }
 
-        // Record live conversion result in learning cache
-        self.record_learning(&reading, &text);
+        // Record learning: use original hiragana reading if this commit follows
+        // partial conversion baking, so that the full reading → final result is learned.
+        let learning_reading = self.original_composing_text.take().unwrap_or(reading);
+        self.record_learning(&learning_reading, &text);
 
         self.enter_empty_state();
 

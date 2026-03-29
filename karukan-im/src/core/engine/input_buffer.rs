@@ -54,7 +54,11 @@ impl InputBuffer {
         self.selection_anchor.and_then(|anchor| {
             let start = anchor.min(self.cursor_pos);
             let end = anchor.max(self.cursor_pos);
-            if start == end { None } else { Some((start, end)) }
+            if start == end {
+                None
+            } else {
+                Some((start, end))
+            }
         })
     }
 

@@ -222,10 +222,7 @@ mod tests {
         assert_eq!(digits_to_kanji("312"), Some("三一二".to_string()));
         assert_eq!(digits_to_kanji("2"), Some("二".to_string()));
         assert_eq!(digits_to_kanji("0"), Some("〇".to_string()));
-        assert_eq!(
-            digits_to_kanji("20世紀"),
-            Some("二〇世紀".to_string())
-        );
+        assert_eq!(digits_to_kanji("20世紀"), Some("二〇世紀".to_string()));
         assert_eq!(digits_to_kanji("あいう"), None);
         assert_eq!(digits_to_kanji(""), None);
     }

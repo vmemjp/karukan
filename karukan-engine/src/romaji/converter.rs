@@ -32,6 +32,10 @@ pub struct RomajiConverter {
     output: String,
     /// Raw ASCII input as typed by the user (for F9/F10 direct conversion)
     raw_input: String,
+    /// True when the last 'ん' in output was produced by the n-before-consonant
+    /// rule (not by explicit "nn" or "n'"). Used by backspace to reclaim 'ん'
+    /// back to 'n' in the buffer when the triggering consonant is deleted.
+    pending_n_reclaim: bool,
 }
 
 impl RomajiConverter {
@@ -42,6 +46,7 @@ impl RomajiConverter {
             buffer: String::new(),
             output: String::new(),
             raw_input: String::new(),
+            pending_n_reclaim: false,
         }
     }
 
@@ -49,6 +54,12 @@ impl RomajiConverter {
     pub fn push(&mut self, ch: char) -> ConversionEvent {
         // Record raw input for F9/F10 direct conversion
         self.raw_input.push(ch);
+
+        // If buffer was empty at push start, any previous n-before-consonant
+        // relationship is stale (the consonant was consumed by a prior conversion).
+        if self.buffer.is_empty() {
+            self.pending_n_reclaim = false;
+        }
 
         // Handle uppercase by converting to lowercase
         let ch = ch.to_ascii_lowercase();
@@ -106,6 +117,7 @@ impl RomajiConverter {
                 let prefix: String = chars.iter().take(char_count - 2).collect();
                 self.buffer = format!("{}{}", prefix, last);
                 self.output.push('ん');
+                self.pending_n_reclaim = true;
                 return self.convert_with_remainder("ん".to_string());
             }
 
@@ -208,7 +220,10 @@ impl RomajiConverter {
             if self.buffer.starts_with('n') {
                 let next = self.buffer.chars().nth(1);
                 if next.is_none()
-                    || !matches!(next.unwrap(), 'a' | 'i' | 'u' | 'e' | 'o' | 'y' | 'n' | '\'')
+                    || !matches!(
+                        next.unwrap(),
+                        'a' | 'i' | 'u' | 'e' | 'o' | 'y' | 'n' | '\''
+                    )
                 {
                     result.push('\u{3093}');
                     self.output.push('\u{3093}');
@@ -239,18 +254,27 @@ impl RomajiConverter {
     /// Handle backspace
     pub fn backspace(&mut self) -> BackspaceResult {
         if let Some(ch) = self.buffer.pop() {
-            // After removing from buffer, if buffer is now empty and the last
-            // output char could start a romaji sequence (has children in the trie),
-            // reclaim it into the buffer so it can combine with the next keystroke.
-            // Example: "hs" → backspace 's' → reclaim 'h' into buffer, so typing
-            // 'a' next produces 'は' instead of 'hあ'.
+            // After removing from buffer, if buffer is now empty, try to reclaim
+            // the last output character into the buffer so it can combine with the
+            // next keystroke.
             if self.buffer.is_empty() {
                 if let Some(&last_out) = self.output.as_bytes().last() {
                     let last_char = last_out as char;
-                    if last_char.is_ascii_lowercase() && self.trie.children.contains_key(&last_char)
+                    // Reclaim ASCII passthrough: e.g., "hs" → backspace 's' →
+                    // reclaim 'h' into buffer, so typing 'a' next produces 'は'.
+                    if last_char.is_ascii_lowercase()
+                        && self.trie.children.contains_key(&last_char)
                     {
                         self.output.pop();
                         self.buffer.push(last_char);
+                    }
+                    // Reclaim auto-converted 'ん': e.g., "ns" → n-before-consonant
+                    // converts 'n' to 'ん' → backspace 's' → reclaim 'ん' as 'n',
+                    // so typing 'a' next produces 'な' instead of 'んあ'.
+                    else if self.pending_n_reclaim && self.output.ends_with('ん') {
+                        self.output.truncate(self.output.len() - 'ん'.len_utf8());
+                        self.buffer.push('n');
+                        self.pending_n_reclaim = false;
                     }
                 }
             }
@@ -287,6 +311,7 @@ impl RomajiConverter {
         self.buffer.clear();
         self.output.clear();
         self.raw_input.clear();
+        self.pending_n_reclaim = false;
     }
 
     /// Get both output and buffer as a single string
@@ -512,5 +537,103 @@ mod tests {
         assert_eq!(conv.output(), "か");
         assert_eq!(conv.buffer(), "k");
         assert_eq!(conv.full_text_katakana(), "カk");
+    }
+
+    #[test]
+    fn test_n_reclaim_basic() {
+        // "ns" triggers n-before-consonant → ん + s
+        // Backspace 's' should reclaim 'ん' → 'n' in buffer
+        let mut conv = RomajiConverter::new();
+        conv.push('n');
+        assert_eq!(conv.buffer(), "n");
+
+        conv.push('s');
+        assert_eq!(conv.output(), "ん");
+        assert_eq!(conv.buffer(), "s");
+
+        conv.backspace(); // remove 's'
+        assert_eq!(conv.output(), "");
+        assert_eq!(conv.buffer(), "n"); // reclaimed
+
+        conv.push('a');
+        assert_eq!(conv.output(), "な");
+        assert_eq!(conv.buffer(), "");
+    }
+
+    #[test]
+    fn test_n_reclaim_after_hiragana() {
+        // "kans" → かん + s → backspace → か + n → "a" → かな
+        let mut conv = RomajiConverter::new();
+        for ch in "kans".chars() {
+            conv.push(ch);
+        }
+        assert_eq!(conv.output(), "かん");
+        assert_eq!(conv.buffer(), "s");
+
+        conv.backspace();
+        assert_eq!(conv.output(), "か");
+        assert_eq!(conv.buffer(), "n");
+
+        conv.push('i');
+        assert_eq!(conv.output(), "かに");
+    }
+
+    #[test]
+    fn test_nn_explicit_no_reclaim() {
+        // Explicit "nn" → ん should NOT be reclaimed
+        let mut conv = RomajiConverter::new();
+        conv.push('n');
+        conv.push('n');
+        assert_eq!(conv.output(), "ん");
+        assert_eq!(conv.buffer(), "");
+
+        // Now type 's' and backspace — should NOT reclaim the ん
+        conv.push('s');
+        assert_eq!(conv.buffer(), "s");
+
+        conv.backspace();
+        assert_eq!(conv.output(), "ん");
+        assert_eq!(conv.buffer(), ""); // no reclaim because nn was explicit
+    }
+
+    #[test]
+    fn test_n_reclaim_with_multi_char_buffer() {
+        // "kansh" → かん + sh → backspace 'h' → buffer="s" (no reclaim yet)
+        // → backspace 's' → reclaim ん → buffer="n"
+        let mut conv = RomajiConverter::new();
+        for ch in "kansh".chars() {
+            conv.push(ch);
+        }
+        assert_eq!(conv.output(), "かん");
+        assert_eq!(conv.buffer(), "sh");
+
+        conv.backspace(); // remove 'h', buffer="s"
+        assert_eq!(conv.output(), "かん");
+        assert_eq!(conv.buffer(), "s");
+
+        conv.backspace(); // remove 's', reclaim ん → n
+        assert_eq!(conv.output(), "か");
+        assert_eq!(conv.buffer(), "n");
+    }
+
+    #[test]
+    fn test_n_reclaim_chain_with_passthrough() {
+        // "kanst" → かん + passthrough 's' + buffer="t"
+        // backspace 't' → reclaim 's' (ASCII reclaim)
+        // backspace 's' → reclaim ん → 'n'
+        let mut conv = RomajiConverter::new();
+        for ch in "kanst".chars() {
+            conv.push(ch);
+        }
+        assert_eq!(conv.output(), "かんs");
+        assert_eq!(conv.buffer(), "t");
+
+        conv.backspace(); // remove 't', ASCII reclaim 's'
+        assert_eq!(conv.output(), "かん");
+        assert_eq!(conv.buffer(), "s");
+
+        conv.backspace(); // remove 's', reclaim ん → n
+        assert_eq!(conv.output(), "か");
+        assert_eq!(conv.buffer(), "n");
     }
 }

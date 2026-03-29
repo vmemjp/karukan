@@ -221,20 +221,19 @@ impl InputMethodEngine {
         let full_text = self.input_buf.text.clone();
 
         // Selection-based partial conversion: convert only the selected range
-        let (reading, remaining) = if let Some((sel_start, sel_end)) =
-            self.input_buf.selection_range()
-        {
-            let before: String = full_text.chars().take(sel_start).collect();
-            let selected: String = full_text
-                .chars()
-                .skip(sel_start)
-                .take(sel_end - sel_start)
-                .collect();
-            let after: String = full_text.chars().skip(sel_end).collect();
-            (selected, Some((before, after)))
-        } else {
-            (full_text, None)
-        };
+        let (reading, remaining) =
+            if let Some((sel_start, sel_end)) = self.input_buf.selection_range() {
+                let before: String = full_text.chars().take(sel_start).collect();
+                let selected: String = full_text
+                    .chars()
+                    .skip(sel_start)
+                    .take(sel_end - sel_start)
+                    .collect();
+                let after: String = full_text.chars().skip(sel_end).collect();
+                (selected, Some((before, after)))
+            } else {
+                (full_text, None)
+            };
         self.remaining_after_conversion = remaining;
         self.input_buf.clear_selection();
 
@@ -306,6 +305,43 @@ impl InputMethodEngine {
         self.enter_conversion_state(&reading, candidate_list)
     }
 
+    /// Build preedit for conversion state, including before/after text for partial conversion.
+    ///
+    /// When `remaining_after_conversion` is set (partial conversion), the preedit shows:
+    ///   before(underline) + conversion_result(highlight) + after(underline)
+    /// Otherwise, just the conversion result with highlight.
+    fn build_conversion_preedit(&self, selected_text: &str) -> Preedit {
+        if let Some((before, after)) = &self.remaining_after_conversion {
+            let before_len = before.chars().count();
+            let sel_len = selected_text.chars().count();
+            let after_len = after.chars().count();
+            let full = format!("{}{}{}", before, selected_text, after);
+            let mut preedit = Preedit::with_text(&full);
+            let mut attrs = Vec::new();
+            if before_len > 0 {
+                attrs.push(PreeditAttribute::underline(0, before_len));
+            }
+            attrs.push(PreeditAttribute::new(
+                before_len,
+                before_len + sel_len,
+                AttributeType::Highlight,
+            ));
+            if after_len > 0 {
+                attrs.push(PreeditAttribute::underline(
+                    before_len + sel_len,
+                    before_len + sel_len + after_len,
+                ));
+            }
+            preedit.set_caret(before_len + sel_len);
+            preedit
+        } else {
+            Preedit::from_segments(
+                vec![PreeditSegment::highlighted(selected_text)],
+                selected_text.chars().count(),
+            )
+        }
+    }
+
     /// Transition to Conversion state with the given reading and candidate list.
     ///
     /// Sets up the preedit (highlighted selected text), updates the state, and
@@ -313,10 +349,7 @@ impl InputMethodEngine {
     fn enter_conversion_state(&mut self, reading: &str, candidates: CandidateList) -> EngineResult {
         let selected_text = candidates.selected_text().unwrap_or(reading).to_string();
 
-        let preedit = Preedit::from_segments(
-            vec![PreeditSegment::highlighted(&selected_text)],
-            selected_text.chars().count(),
-        );
+        let preedit = self.build_conversion_preedit(&selected_text);
 
         self.state = InputState::Conversion {
             preedit: preedit.clone(),
@@ -327,8 +360,7 @@ impl InputMethodEngine {
         let threshold = self.config.candidate_window_threshold;
         let show = threshold == 0 || self.conversion_space_count >= threshold;
 
-        let mut result = EngineResult::consumed()
-            .with_action(EngineAction::UpdatePreedit(preedit));
+        let mut result = EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
         if show {
             result = result
                 .with_action(EngineAction::ShowCandidates(candidates.clone()))
@@ -594,8 +626,17 @@ impl InputMethodEngine {
     }
 
     /// Process key in conversion state
-    pub(super) fn process_key_conversion(&mut self, key: &KeyEvent) -> EngineResult {
+    pub(super) fn process_key_conversion(
+        &mut self,
+        key: &KeyEvent,
+        shift_active: bool,
+    ) -> EngineResult {
         match key.keysym {
+            // Shift+Arrow: cancel conversion → return to Composing with selection
+            Keysym::RIGHT if shift_active => self.conversion_to_selection_right(),
+            Keysym::LEFT if shift_active => self.conversion_to_selection_left(),
+            Keysym::HOME if shift_active => self.conversion_to_selection_home(),
+            Keysym::END if shift_active => self.conversion_to_selection_end(),
             Keysym::RETURN => self.commit_conversion(),
             Keysym::ESCAPE => self.cancel_conversion(),
             Keysym::F6 => self.direct_convert_hiragana(),
@@ -674,36 +715,9 @@ impl InputMethodEngine {
         let remaining = self.remaining_after_conversion.take();
 
         if let Some((before, after)) = remaining {
-            // Partial conversion: commit `before + converted_text`, return `after` to composing
-            let commit_text = format!("{}{}", before, text);
-            self.input_buf.text = after;
-            self.input_buf.cursor_pos = self.input_buf.text.chars().count();
-            self.converters.romaji.reset();
-            self.live.text.clear();
-            let preedit = self.set_composing_state();
-
-            if self.input_buf.text.is_empty() {
-                // Nothing remaining — fully commit and return to empty
-                self.state = InputState::Empty;
-                self.input_buf.clear();
-                return EngineResult::consumed()
-                    .with_action(EngineAction::UpdatePreedit(Preedit::new()))
-                    .with_action(EngineAction::HideCandidates)
-                    .with_action(EngineAction::HideAuxText)
-                    .with_action(EngineAction::Commit(commit_text));
-            }
-
-            let mut result = EngineResult::consumed()
-                .with_action(EngineAction::Commit(commit_text))
-                .with_action(EngineAction::UpdatePreedit(preedit))
-                .with_action(EngineAction::HideCandidates);
-            if self.config.auto_suggest {
-                result =
-                    result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
-            } else {
-                result = result.with_action(EngineAction::HideAuxText);
-            }
-            return result;
+            // Partial conversion: bake the result into the composing buffer
+            // so the user can continue converting other portions.
+            return self.bake_partial_conversion(&before, &text, &after);
         }
 
         self.enter_empty_state();
@@ -725,7 +739,8 @@ impl InputMethodEngine {
             self.record_learning(reading, &text);
         }
 
-        // Build commit text including any before-selection prefix
+        // Build commit text: before + converted (after is discarded since
+        // the user is starting fresh input, not continuing partial conversion)
         let commit_text = if let Some((before, _after)) = self.remaining_after_conversion.take() {
             format!("{}{}", before, text)
         } else {
@@ -754,8 +769,12 @@ impl InputMethodEngine {
         // Restore full original text. input_buf.text is unchanged since
         // start_conversion() and already contains the full composing text
         // (including before/after portions of any partial selection).
-        self.remaining_after_conversion.take();
+        let remaining = self.remaining_after_conversion.take();
         let reading = self.input_buf.text.clone();
+        debug!(
+            "cancel_conversion: reading=\"{}\" remaining={:?}",
+            reading, remaining
+        );
 
         if reading.is_empty() {
             self.enter_empty_state();
@@ -845,35 +864,8 @@ impl InputMethodEngine {
         let remaining = self.remaining_after_conversion.take();
 
         if let Some((before, after)) = remaining {
-            // Partial conversion: commit `before + selected`, return `after` to composing
-            let commit_text = format!("{}{}", before, selected_text);
-            self.input_buf.text = after;
-            self.input_buf.cursor_pos = self.input_buf.text.chars().count();
-            self.converters.romaji.reset();
-            self.live.text.clear();
-            let preedit = self.set_composing_state();
-
-            if self.input_buf.text.is_empty() {
-                self.state = InputState::Empty;
-                self.input_buf.clear();
-                return EngineResult::consumed()
-                    .with_action(EngineAction::UpdatePreedit(Preedit::new()))
-                    .with_action(EngineAction::HideCandidates)
-                    .with_action(EngineAction::HideAuxText)
-                    .with_action(EngineAction::Commit(commit_text));
-            }
-
-            let mut result = EngineResult::consumed()
-                .with_action(EngineAction::Commit(commit_text))
-                .with_action(EngineAction::UpdatePreedit(preedit))
-                .with_action(EngineAction::HideCandidates);
-            if self.config.auto_suggest {
-                result =
-                    result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
-            } else {
-                result = result.with_action(EngineAction::HideAuxText);
-            }
-            return result;
+            // Partial conversion: bake the result into the composing buffer
+            return self.bake_partial_conversion(&before, &selected_text, &after);
         }
 
         self.enter_empty_state();
@@ -891,12 +883,7 @@ impl InputMethodEngine {
         selected_text: &str,
         candidates: &CandidateList,
     ) -> EngineResult {
-        let mut preedit = Preedit::with_text(selected_text);
-        preedit.set_attributes(vec![PreeditAttribute::new(
-            0,
-            selected_text.chars().count(),
-            AttributeType::Highlight,
-        )]);
+        let preedit = self.build_conversion_preedit(selected_text);
 
         if let Some(p) = self.state.preedit_mut() {
             *p = preedit.clone();
@@ -910,8 +897,7 @@ impl InputMethodEngine {
         let threshold = self.config.candidate_window_threshold;
         let show = threshold == 0 || self.conversion_space_count >= threshold;
 
-        let mut result = EngineResult::consumed()
-            .with_action(EngineAction::UpdatePreedit(preedit));
+        let mut result = EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
         if show {
             result = result
                 .with_action(EngineAction::ShowCandidates(candidates.clone()))
@@ -990,6 +976,99 @@ impl InputMethodEngine {
             }
             _ => String::new(),
         }
+    }
+
+    /// Bake a partial conversion result into the composing buffer.
+    ///
+    /// Instead of committing `before + converted` to the application, this replaces
+    /// the selected portion in the composing buffer with the converted text and returns
+    /// to Composing state. This allows the user to continue converting other portions
+    /// regardless of selection direction (start, middle, or end).
+    fn bake_partial_conversion(
+        &mut self,
+        before: &str,
+        converted: &str,
+        after: &str,
+    ) -> EngineResult {
+        // Save the original hiragana reading before the first bake.
+        // input_buf.text is still unchanged at this point (start_conversion doesn't modify it).
+        if self.original_composing_text.is_none() {
+            self.original_composing_text = Some(self.input_buf.text.clone());
+        }
+
+        let new_text = format!("{}{}{}", before, converted, after);
+
+        if new_text.is_empty() {
+            self.enter_empty_state();
+            return EngineResult::consumed()
+                .with_action(EngineAction::UpdatePreedit(Preedit::new()))
+                .with_action(EngineAction::HideCandidates)
+                .with_action(EngineAction::HideAuxText);
+        }
+
+        self.input_buf.text = new_text;
+        self.input_buf.cursor_pos = self.input_buf.text.chars().count();
+        self.input_buf.clear_selection();
+        self.converters.romaji.reset();
+        for ch in self.input_buf.text.chars() {
+            self.converters.romaji.push(ch);
+        }
+        self.live.text.clear();
+
+        let preedit = self.set_composing_state();
+        let mut result = EngineResult::consumed()
+            .with_action(EngineAction::UpdatePreedit(preedit))
+            .with_action(EngineAction::HideCandidates);
+        if self.config.auto_suggest {
+            result = result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
+        } else {
+            result = result.with_action(EngineAction::HideAuxText);
+        }
+        result
+    }
+
+    /// Prepare for transitioning from Conversion back to Composing with selection.
+    ///
+    /// Cleans up conversion state and restores Composing state so that
+    /// `shift_select_*` can be called immediately after.
+    fn prepare_cancel_for_selection(&mut self, cursor_at_start: bool) {
+        self.conversion_space_count = 0;
+        self.remaining_after_conversion = None;
+        let reading = self.input_buf.text.clone();
+        self.input_buf.cursor_pos = if cursor_at_start {
+            0
+        } else {
+            reading.chars().count()
+        };
+        self.converters.romaji.reset();
+        for ch in reading.chars() {
+            self.converters.romaji.push(ch);
+        }
+        self.live.text.clear();
+    }
+
+    /// Shift+Right in Conversion: cancel conversion, place cursor at start, select right
+    fn conversion_to_selection_right(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(true);
+        self.shift_select_right()
+    }
+
+    /// Shift+Left in Conversion: cancel conversion, place cursor at end, select left
+    fn conversion_to_selection_left(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(false);
+        self.shift_select_left()
+    }
+
+    /// Shift+Home in Conversion: cancel conversion, place cursor at end, select to home
+    fn conversion_to_selection_home(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(false);
+        self.shift_select_home()
+    }
+
+    /// Shift+End in Conversion: cancel conversion, place cursor at start, select to end
+    fn conversion_to_selection_end(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(true);
+        self.shift_select_end()
     }
 
     /// Commit text directly and reset state

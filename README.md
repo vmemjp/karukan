@@ -59,7 +59,7 @@ Shift+英字でアルファベットモードに入り、以降の入力はShift
 - 対象: `karukan-im/src/core/engine/input.rs`, `mod.rs`
 
 #### 3. Shift+矢印キーによる選択ベース部分変換
-Composing状態でShift+矢印キーを使って選択範囲を作り、Spaceを押すと選択部分のみを変換します。選択前のテキストはそのまま確定され、選択後のテキストはComposing状態に残ります。選択なしでSpaceを押すとテキスト全体を変換します（従来のカーソル位置分割は廃止）。
+ComposingおよびConversion状態でShift+矢印キーを使って選択範囲を作り、Spaceを押すと選択部分のみを変換します。Conversion状態でShift+矢印を押すと変換をキャンセルしてComposingに戻り、選択が開始されます。確定（Enter）すると変換結果がComposingバッファに焼き込まれ（bake）、残りの部分を続けて変換できます。選択方向は自由で、先頭からでも末尾からでも部分変換が可能です。すべての部分変換が終わったら、ComposingでEnterを押して全体を確定します。各部分変換時に個別の学習が記録されるほか、最終確定時に元のひらがな全文→最終結果の学習も記録されます。
 
 - Shift+Left/Right: 1文字ずつ選択範囲を拡大/縮小
 - Shift+Home/End: 先頭/末尾まで一括選択
@@ -132,7 +132,7 @@ fcitx5がアプリ側のイベント等で `reset()` を呼んだ際、従来は
 - 対象: `karukan-im/src/core/engine/tests/alphabet.rs`, `conversion.rs`, `katakana.rs`, `mode_toggle.rs`, `passthrough.rs`, `karukan-im/src/ffi/tests.rs`
 
 #### 11. Backspace後のローマ字再結合
-ローマ字入力中に誤打した文字をBackspaceで削除した後、正しい文字を入力しても変換が効かない問題を修正しました。例えば「は」を入力するつもりで `hs` と打ち、`s` を削除して `a` を入力すると、従来は「hあ」になっていました。これはBackspaceでバッファから文字を削除した際、直前にパススルーされた子音（`h`）が確定済みのoutputに残ったままになるためです。バッファが空になった時点でoutput末尾の文字がローマ字の先頭になりうる場合（trieに子ノードがある場合）、バッファに戻す（reclaim）ようにしました。
+ローマ字入力中に誤打した文字をBackspaceで削除した後、正しい文字を入力しても変換が効かない問題を修正しました。例えば「は」を入力するつもりで `hs` と打ち、`s` を削除して `a` を入力すると、従来は「hあ」になっていました。これはBackspaceでバッファから文字を削除した際、直前にパススルーされた子音（`h`）が確定済みのoutputに残ったままになるためです。バッファが空になった時点でoutput末尾の文字がローマ字の先頭になりうる場合（trieに子ノードがある場合）、バッファに戻す（reclaim）ようにしました。さらに、「n + 子音」ルールで自動変換された「ん」についても同様のreclaimを実装しました。例えば「な」を入力するつもりで `ns` と打つと `n` が自動的に「ん」に変換されますが、`s` を削除すると「ん」が `n` に戻り、続けて `a` を入力すれば「な」になります。明示的な `nn` や `n'` による「ん」はreclaimされません。
 
 - 対象: `karukan-engine/src/romaji/converter.rs`, `karukan-im/src/core/engine/cursor.rs`
 

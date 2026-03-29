@@ -186,3 +186,20 @@ pub extern "C" fn karukan_engine_commit(engine: *mut KarukanEngine) -> c_int {
     engine.commit.dirty = true;
     1
 }
+
+/// Commit for deactivation — cancels conversion first and commits the
+/// original hiragana text instead of the half-finished conversion result.
+/// Returns 1 if text was committed, 0 otherwise.
+#[unsafe(no_mangle)]
+pub extern "C" fn karukan_engine_commit_for_deactivate(engine: *mut KarukanEngine) -> c_int {
+    let engine = ffi_mut!(engine, 0);
+    let text = engine.engine.commit_for_deactivate();
+
+    if text.is_empty() {
+        return 0;
+    }
+
+    engine.commit.text = CString::new(text).unwrap_or_default();
+    engine.commit.dirty = true;
+    1
+}
