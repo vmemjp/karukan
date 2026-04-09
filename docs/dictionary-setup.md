@@ -6,10 +6,22 @@ karukan-imの辞書を拡張するための辞書導入手順です。
 
 | 辞書                        | エントリ数 | 用途                                   |
 | --------------------------- | ---------- | -------------------------------------- |
-| システム辞書（SudachiDict） | 約266万    | 標準の漢字変換（プリインストール済み） |
+| システム辞書（SudachiDict） | 約266万    | 標準の漢字変換（要ダウンロード）       |
 | jawiki辞書                  | 約71万     | Wikipedia由来の固有名詞・専門用語      |
 | 顔文字・絵文字辞書          | 約1.3万    | 顔文字・Unicode絵文字                  |
 | 記号辞書（Mozc symbol）     | 約4800     | 特殊記号・括弧・矢印・数学記号等       |
+
+## 0. システム辞書のダウンロード
+
+jawiki統合のベースとなるシステム辞書を取得します。すでに `~/.local/share/karukan-im/dict.bin` が存在する場合はスキップしてください。
+
+```bash
+wget https://github.com/togatoga/karukan/releases/download/v0.1.0/dict.tgz
+tar xzf dict.tgz
+mkdir -p ~/.local/share/karukan-im
+cp dict.bin ~/.local/share/karukan-im/
+rm dict.tgz dict.bin
+```
 
 ## 1. jawiki辞書のシステム辞書への統合
 
