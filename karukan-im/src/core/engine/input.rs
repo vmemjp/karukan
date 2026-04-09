@@ -119,21 +119,10 @@ impl InputMethodEngine {
 
     /// Process key in empty state
     pub(super) fn process_key_empty(&mut self, key: &KeyEvent, shift_active: bool) -> EngineResult {
-        // Ctrl+Space: start input with full-width space
-        if key.modifiers.control_key && key.keysym == Keysym::SPACE {
-            self.converters.romaji.reset();
-            self.input_buf.clear();
-            self.input_buf.insert("\u{3000}");
-            let preedit = self.set_composing_state();
-            let mut result =
-                EngineResult::consumed().with_action(EngineAction::UpdatePreedit(preedit));
-            if self.config.auto_suggest {
-                result =
-                    result.with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
-            } else {
-                result = result.with_action(EngineAction::HideAuxText);
-            }
-            return result;
+        // Space / Ctrl+Space: commit full-width space directly
+        if key.keysym == Keysym::SPACE && !key.modifiers.alt_key {
+            return EngineResult::consumed()
+                .with_action(EngineAction::Commit("\u{3000}".to_string()));
         }
 
         // Only handle printable characters without modifiers (except shift)
