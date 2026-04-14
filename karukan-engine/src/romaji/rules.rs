@@ -338,16 +338,11 @@ pub fn build_rules() -> TrieNode {
     trie.insert("xka", "ヵ");
     trie.insert("xke", "ヶ");
 
-    // Long vowel mark
-    trie.insert("-", "ー");
-
     // Punctuation and symbols
+    // Note: - ? ! ~ are intentionally left as passthrough (half-width)
     trie.insert(",", "、");
     trie.insert(".", "。");
     trie.insert("/", "・");
-    trie.insert("?", "？");
-    trie.insert("!", "！");
-    trie.insert("~", "〜");
 
     // Brackets
     trie.insert("[", "「");
@@ -566,8 +561,11 @@ mod tests {
         assert_eq!(trie.search_longest("]").output.unwrap(), "」");
         assert_eq!(trie.search_longest(",").output.unwrap(), "、");
         assert_eq!(trie.search_longest(".").output.unwrap(), "。");
-        assert_eq!(trie.search_longest("-").output.unwrap(), "ー");
-        assert_eq!(trie.search_longest("~").output.unwrap(), "〜");
+        // - ? ! ~ are passthrough (no rule)
+        assert!(trie.search_longest("-").output.is_none());
+        assert!(trie.search_longest("?").output.is_none());
+        assert!(trie.search_longest("!").output.is_none());
+        assert!(trie.search_longest("~").output.is_none());
     }
 
     #[test]

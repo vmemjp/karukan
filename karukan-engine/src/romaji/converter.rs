@@ -404,7 +404,7 @@ mod tests {
         for ch in input.chars() {
             conv.push(ch);
         }
-        assert_eq!(conv.output(), "ここはどこ？わたしはだれ？");
+        assert_eq!(conv.output(), "ここはどこ?わたしはだれ?");
         assert_eq!(conv.buffer(), "");
     }
 
@@ -416,12 +416,12 @@ mod tests {
             conv.push(ch);
         }
         // 'c' stays in buffer because it could start 'ca', 'chi', etc.
-        assert_eq!(conv.output(), "あ！b？");
+        assert_eq!(conv.output(), "あ!b?");
         assert_eq!(conv.buffer(), "c");
 
         // After flush, 'c' passes through
         conv.flush();
-        assert_eq!(conv.output(), "あ！b？c");
+        assert_eq!(conv.output(), "あ!b?c");
         assert_eq!(conv.buffer(), "");
     }
 
@@ -432,7 +432,7 @@ mod tests {
         for ch in input.chars() {
             conv.push(ch);
         }
-        assert_eq!(conv.output(), "ここはどこ？わたしは？");
+        assert_eq!(conv.output(), "ここはどこ?わたしは?");
         assert_eq!(conv.buffer(), "");
     }
 
@@ -445,7 +445,7 @@ mod tests {
         for ch in input.chars() {
             conv.push(ch);
         }
-        assert_eq!(conv.output(), "あ？b？ちゃ");
+        assert_eq!(conv.output(), "あ?b?ちゃ");
         assert_eq!(conv.buffer(), "");
     }
 
