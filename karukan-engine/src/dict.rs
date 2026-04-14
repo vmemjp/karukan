@@ -203,7 +203,7 @@ impl Dictionary {
         // Trie
         r.read_exact(&mut buf4)?;
         let trie_len = u32::from_le_bytes(buf4) as usize;
-        const MAX_TRIE_LEN: usize = 100 * 1024 * 1024; // 100 MB
+        const MAX_TRIE_LEN: usize = 256 * 1024 * 1024; // 256 MB
         if trie_len > MAX_TRIE_LEN {
             return Err(DictError::Format(format!(
                 "trie_len too large: {} (max {})",
