@@ -81,6 +81,19 @@ nix run .#karukan-cli -- dict build /tmp/karukan-dict-all.tsv \
 | place-names | - |
 | alt-cannadic | - |
 
+## ユーザー辞書 (絵文字・記号)
+
+upstream の機能を利用。`~/.local/share/karukan-im/user_dicts/` にファイルを置くだけで自動読み込み。
+
+導入済み辞書:
+- **kaomoji-emoji.tsv** (12,855エントリ) — 絵文字・顔文字 (peaceiris/emoji-ime-dictionary, kaomoji-json, tiwanari/emoticon, Mozc emoticon.tsv)
+- **symbol.tsv** (4,821エントリ) — 記号 (Mozc symbol.tsv)
+
+## バグ修正
+
+- **LightModelOnly strategy が長い入力で変換失敗** — `num_candidates` を無視して常に1候補しか返さなかったバグを修正。長い文 (>10トークン) でもモデル推論が正しく候補を返すようになった
+- **preedit 属性がC++側で無視されていた** — FFI を通じて underline/highlight 属性を渡すようにし、Shift+Arrow 選択のハイライト表示に対応
+
 ## karukan-engine の追加関数
 
 - `hiragana_to_halfwidth_katakana()` — ひらがな → 半角カタカナ変換
