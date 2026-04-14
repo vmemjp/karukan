@@ -101,7 +101,7 @@ impl InputMethodEngine {
                     return vec![];
                 };
                 light_converter
-                    .convert(&katakana, &api_context, 1)
+                    .convert(&katakana, &api_context, num_candidates)
                     .unwrap_or_default()
             }
             ConversionStrategy::MainModelOnly => converter
