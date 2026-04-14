@@ -499,6 +499,11 @@ impl InputMethodEngine {
             Keysym::F6 => self.direct_convert_hiragana(),
             Keysym::F7 => self.direct_convert_katakana(),
             Keysym::F8 => self.direct_convert_halfwidth_katakana(),
+            // Shift+Arrow: cancel conversion, return to composing with selection
+            Keysym::RIGHT if key.modifiers.shift_key => self.conversion_to_selection_right(),
+            Keysym::LEFT if key.modifiers.shift_key => self.conversion_to_selection_left(),
+            Keysym::HOME if key.modifiers.shift_key => self.conversion_to_selection_home(),
+            Keysym::END if key.modifiers.shift_key => self.conversion_to_selection_end(),
             _ => {
                 // Ctrl+key: emacs-style shortcuts
                 if key.modifiers.control_key && !key.modifiers.alt_key {
@@ -848,6 +853,50 @@ impl InputMethodEngine {
             }
             _ => String::new(),
         }
+    }
+
+    /// Prepare for transitioning from Conversion back to Composing with selection.
+    ///
+    /// Cleans up conversion state and restores Composing state so that
+    /// `shift_select_*` can be called immediately after.
+    fn prepare_cancel_for_selection(&mut self, cursor_at_start: bool) {
+        self.remaining_after_conversion = None;
+        let reading = self.input_buf.text.clone();
+        self.input_buf.cursor_pos = if cursor_at_start {
+            0
+        } else {
+            reading.chars().count()
+        };
+        self.converters.romaji.reset();
+        self.live.text.clear();
+        self.state = InputState::Composing {
+            preedit: Preedit::new(),
+            romaji_buffer: String::new(),
+        };
+    }
+
+    /// Shift+Right in Conversion: cancel conversion, place cursor at start, select right
+    fn conversion_to_selection_right(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(true);
+        self.shift_select_right()
+    }
+
+    /// Shift+Left in Conversion: cancel conversion, place cursor at end, select left
+    fn conversion_to_selection_left(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(false);
+        self.shift_select_left()
+    }
+
+    /// Shift+Home in Conversion: cancel conversion, place cursor at end, select to home
+    fn conversion_to_selection_home(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(false);
+        self.shift_select_home()
+    }
+
+    /// Shift+End in Conversion: cancel conversion, place cursor at start, select to end
+    fn conversion_to_selection_end(&mut self) -> EngineResult {
+        self.prepare_cancel_for_selection(true);
+        self.shift_select_end()
     }
 
     /// Bake a partial conversion result into the composing buffer.
