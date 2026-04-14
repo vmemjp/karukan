@@ -104,6 +104,27 @@ uint32_t karukan_engine_get_preedit_len(const KarukanEngine* engine);
  */
 uint32_t karukan_engine_get_preedit_caret(const KarukanEngine* engine);
 
+/*
+ * Get the number of preedit attributes.
+ */
+uint32_t karukan_engine_get_preedit_attr_count(const KarukanEngine* engine);
+
+/*
+ * Get a preedit attribute's start byte offset.
+ */
+uint32_t karukan_engine_get_preedit_attr_start(const KarukanEngine* engine, uint32_t index);
+
+/*
+ * Get a preedit attribute's end byte offset.
+ */
+uint32_t karukan_engine_get_preedit_attr_end(const KarukanEngine* engine, uint32_t index);
+
+/*
+ * Get a preedit attribute's type.
+ * Returns 0 for underline, 1 for highlight.
+ */
+uint32_t karukan_engine_get_preedit_attr_type(const KarukanEngine* engine, uint32_t index);
+
 /* --- Commit text --- */
 
 /*
