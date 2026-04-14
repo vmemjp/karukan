@@ -196,7 +196,31 @@ void KarukanState::updateUI() {
 
         Text preedit;
         if (preeditText && preeditLen > 0) {
-            preedit.append(std::string(preeditText, preeditLen), TextFormatFlag::Underline);
+            std::string fullText(preeditText, preeditLen);
+            uint32_t attrCount = karukan_engine_get_preedit_attr_count(rustEngine_);
+
+            if (attrCount > 0) {
+                // Build preedit with per-segment formatting
+                for (uint32_t i = 0; i < attrCount; i++) {
+                    uint32_t start = karukan_engine_get_preedit_attr_start(rustEngine_, i);
+                    uint32_t end = karukan_engine_get_preedit_attr_end(rustEngine_, i);
+                    uint32_t type_ = karukan_engine_get_preedit_attr_type(rustEngine_, i);
+
+                    if (start >= preeditLen || end > preeditLen || start >= end) continue;
+
+                    std::string segment = fullText.substr(start, end - start);
+                    if (type_ == 1) {
+                        // Highlight
+                        preedit.append(segment, TextFormatFlag::HighLight);
+                    } else {
+                        // Underline
+                        preedit.append(segment, TextFormatFlag::Underline);
+                    }
+                }
+            } else {
+                // No attributes: default to underline
+                preedit.append(fullText, TextFormatFlag::Underline);
+            }
             preedit.setCursor(static_cast<int>(preeditCaret));
         }
 

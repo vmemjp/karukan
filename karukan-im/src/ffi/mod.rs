@@ -61,11 +61,21 @@ fn init_logging() {
     });
 }
 
+/// A preedit attribute for FFI consumption (byte offsets).
+#[derive(Default, Clone)]
+struct PreeditAttrFFI {
+    start_bytes: u32,
+    end_bytes: u32,
+    /// 0 = underline, 1 = highlight
+    attr_type: u32,
+}
+
 /// Cached preedit text and caret position for FFI consumption.
 #[derive(Default)]
 struct PreeditCache {
     text: CString,
     caret_bytes: u32,
+    attrs: Vec<PreeditAttrFFI>,
     dirty: bool,
 }
 
@@ -158,15 +168,42 @@ impl KarukanEngine {
         for action in actions {
             match action {
                 EngineAction::UpdatePreedit(preedit) => {
+                    let text = preedit.text();
                     let caret_chars = preedit.caret();
-                    let caret_bytes = preedit
-                        .text()
+                    let caret_bytes = text
                         .char_indices()
                         .nth(caret_chars)
                         .map(|(i, _)| i)
-                        .unwrap_or(preedit.text().len());
+                        .unwrap_or(text.len());
                     self.preedit.caret_bytes = caret_bytes as u32;
-                    self.preedit.text = CString::new(preedit.text()).unwrap_or_default();
+
+                    // Convert char-based attributes to byte-based
+                    let char_indices: Vec<usize> = text
+                        .char_indices()
+                        .map(|(i, _)| i)
+                        .chain(std::iter::once(text.len()))
+                        .collect();
+                    self.preedit.attrs = preedit
+                        .attributes()
+                        .iter()
+                        .map(|a| {
+                            let start = char_indices.get(a.start).copied().unwrap_or(0) as u32;
+                            let end = char_indices.get(a.end).copied().unwrap_or(text.len()) as u32;
+                            let attr_type = match a.attr_type {
+                                crate::core::preedit::AttributeType::Underline => 0,
+                                crate::core::preedit::AttributeType::Highlight => 1,
+                                crate::core::preedit::AttributeType::UnderlineDouble => 2,
+                                crate::core::preedit::AttributeType::Reverse => 3,
+                            };
+                            PreeditAttrFFI {
+                                start_bytes: start,
+                                end_bytes: end,
+                                attr_type,
+                            }
+                        })
+                        .collect();
+
+                    self.preedit.text = CString::new(text).unwrap_or_default();
                     self.preedit.dirty = true;
                 }
                 EngineAction::ShowCandidates(candidates) => {
