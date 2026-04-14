@@ -214,6 +214,12 @@ impl InputMethodEngine {
                 Keysym::KEY_E | Keysym::KEY_E_UPPER => return self.move_caret_end(),
                 // Ctrl+F: move right (Emacs-style Right)
                 Keysym::KEY_F | Keysym::KEY_F_UPPER => return self.move_caret_right(),
+                // Ctrl+H: backspace (Emacs-style)
+                Keysym::KEY_H | Keysym::KEY_H_UPPER => return self.backspace_composing(),
+                // Ctrl+I: convert to katakana (same as F7)
+                Keysym::KEY_I | Keysym::KEY_I_UPPER => return self.direct_convert_katakana(),
+                // Ctrl+U: cancel composing (delete all)
+                Keysym::KEY_U | Keysym::KEY_U_UPPER => return self.cancel_composing(),
                 _ => {}
             }
         }
@@ -223,6 +229,9 @@ impl InputMethodEngine {
             Keysym::ESCAPE => self.cancel_composing(),
             Keysym::BACKSPACE => self.backspace_composing(),
             Keysym::DELETE => self.delete_composing(),
+            Keysym::F6 => self.direct_convert_hiragana(),
+            Keysym::F7 => self.direct_convert_katakana(),
+            Keysym::F8 => self.direct_convert_halfwidth_katakana(),
             Keysym::SPACE if self.input_mode == InputMode::Alphabet => self.input_char(' '),
             Keysym::SPACE | Keysym::DOWN | Keysym::TAB => self.start_conversion(),
             Keysym::LEFT => self.move_caret_left(),

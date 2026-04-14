@@ -479,12 +479,27 @@ impl InputMethodEngine {
             Keysym::PAGE_DOWN => self.next_candidate_page(),
             Keysym::PAGE_UP => self.prev_candidate_page(),
             Keysym::BACKSPACE => self.backspace_conversion(),
+            Keysym::F6 => self.direct_convert_hiragana(),
+            Keysym::F7 => self.direct_convert_katakana(),
+            Keysym::F8 => self.direct_convert_halfwidth_katakana(),
             _ => {
-                // Ctrl+N / Ctrl+P: emacs-style candidate navigation
+                // Ctrl+key: emacs-style shortcuts
                 if key.modifiers.control_key && !key.modifiers.alt_key {
                     match key.keysym {
                         Keysym::KEY_N | Keysym::KEY_N_UPPER => return self.next_candidate(),
                         Keysym::KEY_P | Keysym::KEY_P_UPPER => return self.prev_candidate(),
+                        // Ctrl+H: backspace (Emacs-style)
+                        Keysym::KEY_H | Keysym::KEY_H_UPPER => {
+                            return self.backspace_conversion()
+                        }
+                        // Ctrl+I: convert to katakana (same as F7)
+                        Keysym::KEY_I | Keysym::KEY_I_UPPER => {
+                            return self.direct_convert_katakana()
+                        }
+                        // Ctrl+U: cancel conversion (delete all)
+                        Keysym::KEY_U | Keysym::KEY_U_UPPER => {
+                            return self.cancel_conversion()
+                        }
                         _ => {}
                     }
                 }
@@ -709,5 +724,60 @@ impl InputMethodEngine {
     fn backspace_conversion(&mut self) -> EngineResult {
         // Return to hiragana mode with the reading
         self.cancel_conversion()
+    }
+
+    /// F6 / Ctrl+U: Commit as hiragana
+    pub(super) fn direct_convert_hiragana(&mut self) -> EngineResult {
+        let text = self.get_reading_for_direct_convert();
+        if text.is_empty() {
+            return EngineResult::not_consumed();
+        }
+        self.commit_direct(text)
+    }
+
+    /// F7 / Ctrl+I: Commit as full-width katakana
+    pub(super) fn direct_convert_katakana(&mut self) -> EngineResult {
+        let text = self.get_reading_for_direct_convert();
+        if text.is_empty() {
+            return EngineResult::not_consumed();
+        }
+        let katakana = karukan_engine::hiragana_to_katakana(&text);
+        self.commit_direct(katakana)
+    }
+
+    /// F8: Commit as half-width katakana
+    pub(super) fn direct_convert_halfwidth_katakana(&mut self) -> EngineResult {
+        let text = self.get_reading_for_direct_convert();
+        if text.is_empty() {
+            return EngineResult::not_consumed();
+        }
+        let hw_katakana = karukan_engine::hiragana_to_halfwidth_katakana(&text);
+        self.commit_direct(hw_katakana)
+    }
+
+    /// Get hiragana reading from current state (Composing or Conversion)
+    fn get_reading_for_direct_convert(&mut self) -> String {
+        match &self.state {
+            InputState::Conversion { .. } => self.input_buf.text.clone(),
+            InputState::Composing { .. } => {
+                self.flush_romaji_to_composed();
+                self.input_buf.text.clone()
+            }
+            _ => String::new(),
+        }
+    }
+
+    /// Commit text directly and reset to empty state
+    fn commit_direct(&mut self, text: String) -> EngineResult {
+        self.converters.romaji.reset();
+        self.input_buf.clear();
+        self.live.text.clear();
+        self.state = InputState::Empty;
+
+        EngineResult::consumed()
+            .with_action(EngineAction::UpdatePreedit(Preedit::new()))
+            .with_action(EngineAction::HideCandidates)
+            .with_action(EngineAction::HideAuxText)
+            .with_action(EngineAction::Commit(text))
     }
 }
