@@ -268,6 +268,21 @@ impl CandidateList {
         self.candidates = candidates;
         self.cursor = 0;
     }
+
+    /// Remove the currently selected candidate and adjust cursor.
+    pub fn remove_selected(&mut self) {
+        if self.candidates.is_empty() {
+            return;
+        }
+        self.candidates.remove(self.cursor);
+        // Re-index remaining candidates
+        for (i, c) in self.candidates.iter_mut().enumerate() {
+            c.index = i;
+        }
+        if self.cursor >= self.candidates.len() && self.cursor > 0 {
+            self.cursor -= 1;
+        }
+    }
 }
 
 impl Default for CandidateList {

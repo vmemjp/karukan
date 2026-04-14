@@ -45,11 +45,13 @@ impl InputMethodEngine {
             let mut all_candidates = self.lookup_learning_candidates(&reading);
             append_candidates_dedup(&mut all_candidates, self.lookup_dict_candidates(&reading));
             if all_candidates.is_empty() {
+                self.composing_candidates = None;
                 return EngineResult::consumed()
                     .with_action(EngineAction::UpdatePreedit(preedit))
                     .with_action(EngineAction::HideCandidates)
                     .with_action(EngineAction::UpdateAuxText(self.format_aux_composing()));
             }
+            self.composing_candidates = Some(all_candidates.clone());
             return EngineResult::consumed()
                 .with_action(EngineAction::UpdatePreedit(preedit))
                 .with_action(EngineAction::ShowCandidates(CandidateList::new(
@@ -69,8 +71,10 @@ impl InputMethodEngine {
             let mut all_candidates = self.lookup_learning_candidates(&reading);
             append_candidates_dedup(&mut all_candidates, self.lookup_dict_candidates(&reading));
             if all_candidates.is_empty() {
+                self.composing_candidates = None;
                 result = result.with_action(EngineAction::HideCandidates);
             } else {
+                self.composing_candidates = Some(all_candidates.clone());
                 result = result.with_action(EngineAction::ShowCandidates(CandidateList::new(
                     all_candidates,
                 )));
@@ -92,6 +96,7 @@ impl InputMethodEngine {
         append_candidates_dedup(&mut all_candidates, model_candidates);
         // Then dictionary candidates
         append_candidates_dedup(&mut all_candidates, self.lookup_dict_candidates(&reading));
+        self.composing_candidates = Some(all_candidates.clone());
         let aux = self.format_aux_suggest(&self.input_buf.text.clone());
         EngineResult::consumed()
             .with_action(EngineAction::UpdatePreedit(preedit))
@@ -234,11 +239,43 @@ impl InputMethodEngine {
             Keysym::F8 => self.direct_convert_halfwidth_katakana(),
             Keysym::SPACE if self.input_mode == InputMode::Alphabet => self.input_char(' '),
             Keysym::SPACE | Keysym::DOWN | Keysym::TAB => self.start_conversion(),
+            // Shift+Arrow: extend/shrink selection (must be before plain Arrow)
+            Keysym::LEFT if shift_active => self.shift_select_left(),
+            Keysym::RIGHT if shift_active => self.shift_select_right(),
+            Keysym::HOME if shift_active => self.shift_select_home(),
+            Keysym::END if shift_active => self.shift_select_end(),
+            // Plain Arrow: cursor movement (clears selection)
             Keysym::LEFT => self.move_caret_left(),
             Keysym::RIGHT => self.move_caret_right(),
             Keysym::HOME => self.move_caret_home(),
             Keysym::END => self.move_caret_end(),
             _ => {
+                // Digit key: if composing candidates are visible, select and commit
+                if let Some(digit) = key.keysym.digit_value()
+                    && !key.modifiers.control_key
+                    && !key.modifiers.alt_key
+                {
+                    if let Some(ref candidates) = self.composing_candidates {
+                        let index = digit - 1; // digit 1 = index 0
+                        if index < candidates.len() {
+                            let selected = &candidates[index];
+                            let text = selected.text.clone();
+                            let reading = self.input_buf.text.clone();
+                            self.record_learning(&reading, &text);
+                            self.composing_candidates = None;
+                            self.converters.romaji.reset();
+                            self.input_buf.clear();
+                            self.live.text.clear();
+                            self.state = InputState::Empty;
+                            return EngineResult::consumed()
+                                .with_action(EngineAction::UpdatePreedit(Preedit::new()))
+                                .with_action(EngineAction::HideCandidates)
+                                .with_action(EngineAction::HideAuxText)
+                                .with_action(EngineAction::Commit(text));
+                        }
+                    }
+                }
+
                 if let Some(ch) = key.to_char()
                     && !key.modifiers.control_key
                     && !key.modifiers.alt_key

@@ -171,6 +171,24 @@ impl LearningCache {
         Ok(())
     }
 
+    /// Remove a specific (reading, surface) entry from the cache.
+    /// Returns true if the entry was found and removed.
+    pub fn remove(&mut self, reading: &str, surface: &str) -> bool {
+        let Some(entries) = self.entries.get_mut(reading) else {
+            return false;
+        };
+        let before = entries.len();
+        entries.retain(|e| e.surface != surface);
+        let removed = entries.len() < before;
+        if entries.is_empty() {
+            self.entries.remove(reading);
+        }
+        if removed {
+            self.dirty = true;
+        }
+        removed
+    }
+
     /// Whether there are unsaved changes.
     pub fn is_dirty(&self) -> bool {
         self.dirty

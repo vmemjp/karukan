@@ -106,6 +106,15 @@ pub struct InputMethodEngine {
     dicts: Dictionaries,
     /// Learning cache (user conversion history)
     learning: Option<LearningCache>,
+    /// Candidates shown during composing state (auto-suggest / dictionary).
+    /// Used for digit-key selection in composing mode.
+    composing_candidates: Option<Vec<Candidate>>,
+    /// Remaining text around a partial conversion (before, after).
+    /// Set when Shift+Arrow selects a portion and Space converts it.
+    remaining_after_conversion: Option<(String, String)>,
+    /// Original composing text before partial conversion baking.
+    /// Used for learning: maps original reading to final result.
+    original_composing_text: Option<String>,
 }
 
 impl InputMethodEngine {
@@ -126,6 +135,9 @@ impl InputMethodEngine {
             live: LiveConversion::default(),
             dicts: Dictionaries::default(),
             learning: None,
+            composing_candidates: None,
+            remaining_after_conversion: None,
+            original_composing_text: None,
         }
     }
 
@@ -193,6 +205,9 @@ impl InputMethodEngine {
         self.input_buf.clear();
         self.live.text.clear();
         self.metrics = ConversionMetrics::default();
+        self.composing_candidates = None;
+        self.remaining_after_conversion = None;
+        self.original_composing_text = None;
     }
 
     /// If the display is empty, reset to Empty state and return the result.

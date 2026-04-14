@@ -2,6 +2,8 @@
 
 This fork of [togatoga/karukan](https://github.com/togatoga/karukan) adds NixOS support and keybinding improvements.
 
+Some features (Shift+Arrow partial conversion, F6-F8 direct conversion, half-width katakana conversion) were inspired by or adapted from [riq0h/karukan](https://github.com/riq0h/karukan).
+
 ## NixOS Support
 
 ### flake.nix
@@ -38,6 +40,10 @@ Composing (入力中) と Conversion (変換候補選択中) の両方で有効:
 | F8 | 半角カタカナ変換確定 |
 | Ctrl+H | バックスペース (Emacs-style) |
 | Ctrl+U | 入力キャンセル (全消し) |
+| Shift+Left/Right | 選択範囲の拡大/縮小 (部分変換用) |
+| Shift+Home/End | カーソルから先頭/末尾まで選択 |
+| Ctrl+Delete | 変換候補を学習データから削除 |
+| 1-9 (候補表示中) | 候補を数字キーで直接選択・確定 |
 
 ## 辞書ビルド (mozcdic-ut)
 
