@@ -36,6 +36,8 @@
 
           # Common args for Rust builds
           commonArgs = {
+            pname = "karukan";
+            version = "0.1.0";
             src = craneLib.cleanCargoSource ./.;
 
             nativeBuildInputs = with pkgs; [
