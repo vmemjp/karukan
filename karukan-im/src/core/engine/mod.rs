@@ -462,8 +462,13 @@ impl InputMethodEngine {
         }
 
         trace!(
-            "Processing key: {:?} in state: {:?}",
-            key.keysym, self.state
+            "Processing key: {:?} mods=ctrl:{} shift:{} alt:{} release:{} in state: {:?}",
+            key.keysym,
+            key.modifiers.control_key,
+            key.modifiers.shift_key,
+            key.modifiers.alt_key,
+            !key.is_press,
+            self.state
         );
 
         let start = std::time::Instant::now();
