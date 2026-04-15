@@ -28,6 +28,9 @@ target/
 # Claude Code
 .claude/
 
+# Nix
+result
+
 build
 *.bin
 data/
