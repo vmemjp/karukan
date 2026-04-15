@@ -120,7 +120,11 @@ impl InputMethodEngine {
     /// Process key in empty state
     pub(super) fn process_key_empty(&mut self, key: &KeyEvent, shift_active: bool) -> EngineResult {
         // Shift+Space: commit full-width space. Plain Space: half-width (bypass fcitx5 punctuation).
-        if key.keysym == Keysym::SPACE && !key.modifiers.alt_key {
+        // Ctrl+Space: pass through (user reserves Ctrl+Space for other bindings).
+        if key.keysym == Keysym::SPACE
+            && !key.modifiers.alt_key
+            && !key.modifiers.control_key
+        {
             let s = if shift_active { "\u{3000}" } else { " " };
             return EngineResult::consumed()
                 .with_action(EngineAction::Commit(s.to_string()));

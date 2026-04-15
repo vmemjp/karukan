@@ -3,9 +3,9 @@ use super::*;
 // --- Live conversion tests ---
 
 #[test]
-fn test_live_conversion_enabled_by_default() {
+fn test_live_conversion_disabled_by_default() {
     let engine = InputMethodEngine::new();
-    assert!(engine.live.enabled);
+    assert!(!engine.live.enabled);
 }
 
 #[test]
@@ -18,7 +18,6 @@ fn test_live_conversion_enabled() {
 fn test_live_conversion_off_unchanged() {
     // With live_conversion=false, auto-suggest should show candidates (existing behavior)
     let mut engine = InputMethodEngine::new();
-    engine.live.enabled = false;
     assert!(!engine.live.enabled);
 
     // Type "ai" -> "あい" (standard hiragana preedit)
@@ -153,13 +152,36 @@ fn test_live_conversion_build_preedit() {
 // --- Ctrl+Space full-width space tests ---
 
 #[test]
-fn test_space_commits_fullwidth_space_in_empty() {
+fn test_space_commits_halfwidth_space_in_empty() {
     let mut engine = InputMethodEngine::new();
 
-    // Space in Empty state -> commit full-width space directly
+    // Plain Space in Empty state -> commit half-width space (bypass fcitx5 punctuation)
     let result = engine.process_key(&press_key(Keysym::SPACE));
     assert!(result.consumed);
     assert!(matches!(engine.state(), InputState::Empty));
+    let commit_text = result
+        .actions
+        .iter()
+        .find_map(|a| {
+            if let EngineAction::Commit(text) = a {
+                Some(text.clone())
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    assert_eq!(commit_text, " ");
+}
+
+#[test]
+fn test_shift_space_commits_fullwidth_space_in_empty() {
+    let mut engine = InputMethodEngine::new();
+
+    // Shift+Space in Empty state -> commit full-width space
+    let mut key = press_key(Keysym::SPACE);
+    key.modifiers.shift_key = true;
+    let result = engine.process_key(&key);
+    assert!(result.consumed);
     let commit_text = result
         .actions
         .iter()
@@ -175,25 +197,12 @@ fn test_space_commits_fullwidth_space_in_empty() {
 }
 
 #[test]
-fn test_ctrl_space_commits_fullwidth_space_in_empty() {
+fn test_ctrl_space_passthrough_in_empty() {
     let mut engine = InputMethodEngine::new();
 
-    // Ctrl+Space in Empty state -> also commit full-width space directly
+    // Ctrl+Space in Empty state -> pass through (user reserves Ctrl+Space)
     let result = engine.process_key(&press_ctrl(Keysym::SPACE));
-    assert!(result.consumed);
-    assert!(matches!(engine.state(), InputState::Empty));
-    let commit_text = result
-        .actions
-        .iter()
-        .find_map(|a| {
-            if let EngineAction::Commit(text) = a {
-                Some(text.clone())
-            } else {
-                None
-            }
-        })
-        .unwrap();
-    assert_eq!(commit_text, "\u{3000}");
+    assert!(!result.consumed);
 }
 
 #[test]
@@ -239,46 +248,46 @@ fn test_ctrl_space_fullwidth_space_commit() {
 #[test]
 fn test_ctrl_shift_l_toggles_live_conversion() {
     let mut engine = InputMethodEngine::new();
+    assert!(!engine.live.enabled);
+
+    // Ctrl+Shift+L → toggle ON
+    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
+    assert!(result.consumed);
     assert!(engine.live.enabled);
 
-    // Ctrl+Shift+L → toggle OFF (starts ON)
+    // Ctrl+Shift+L again → toggle OFF
     let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
     assert!(result.consumed);
     assert!(!engine.live.enabled);
-
-    // Ctrl+Shift+L again → toggle ON
-    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
-    assert!(result.consumed);
-    assert!(engine.live.enabled);
 }
 
 #[test]
 fn test_ctrl_shift_l_lowercase_toggles() {
     let mut engine = InputMethodEngine::new();
-    assert!(engine.live.enabled);
+    assert!(!engine.live.enabled);
 
-    // Ctrl+Shift+l (lowercase keysym) → toggle OFF (starts ON)
+    // Ctrl+Shift+l (lowercase keysym) → toggle ON
     let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L));
     assert!(result.consumed);
-    assert!(!engine.live.enabled);
+    assert!(engine.live.enabled);
 }
 
 #[test]
 fn test_ctrl_shift_l_shows_aux_text() {
     let mut engine = InputMethodEngine::new();
 
-    // Ctrl+Shift+L → toggles OFF first (default is ON)
-    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
-    let has_aux = result.actions.iter().any(
-        |a| matches!(a, EngineAction::UpdateAuxText(text) if text.contains("ライブ変換: OFF")),
-    );
-    assert!(has_aux);
-
-    // Ctrl+Shift+L again → "ライブ変換: ON"
+    // Ctrl+Shift+L → check aux text shows "ライブ変換: ON"
     let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
     let has_aux = result
         .actions
         .iter()
         .any(|a| matches!(a, EngineAction::UpdateAuxText(text) if text.contains("ライブ変換: ON")));
+    assert!(has_aux);
+
+    // Ctrl+Shift+L again → "ライブ変換: OFF"
+    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
+    let has_aux = result.actions.iter().any(
+        |a| matches!(a, EngineAction::UpdateAuxText(text) if text.contains("ライブ変換: OFF")),
+    );
     assert!(has_aux);
 }

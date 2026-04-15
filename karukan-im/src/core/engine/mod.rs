@@ -133,10 +133,7 @@ impl InputMethodEngine {
             metrics: ConversionMetrics::default(),
             input_mode: InputMode::Hiragana,
             input_buf: InputBuffer::new(),
-            live: LiveConversion {
-                enabled: true,
-                text: String::new(),
-            },
+            live: LiveConversion::default(),
             dicts: Dictionaries::default(),
             learning: None,
             remaining_after_conversion: None,
@@ -152,6 +149,11 @@ impl InputMethodEngine {
             config,
             ..Self::new()
         }
+    }
+
+    /// Enable or disable live conversion (used by FFI to set non-default startup state)
+    pub fn set_live_conversion(&mut self, enabled: bool) {
+        self.live.enabled = enabled;
     }
 
     /// Get last conversion time in milliseconds (inference only)

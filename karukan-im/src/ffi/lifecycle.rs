@@ -12,7 +12,9 @@ use super::{KarukanEngine, ffi_mut, init_logging};
 #[unsafe(no_mangle)]
 pub extern "C" fn karukan_engine_new() -> *mut KarukanEngine {
     init_logging();
-    let engine = Box::new(KarukanEngine::new());
+    let mut engine = Box::new(KarukanEngine::new());
+    // Default live conversion ON for fcitx5 usage (tests keep the OFF default).
+    engine.engine.set_live_conversion(true);
     Box::into_raw(engine)
 }
 
