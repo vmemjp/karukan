@@ -266,6 +266,7 @@ fn test_alphabet_mode_cancel_clears_flags() {
 #[test]
 fn test_alphabet_mode_aux_text() {
     let mut engine = InputMethodEngine::new();
+    engine.live.enabled = false;
 
     // In hiragana mode, aux should show [あ]
     engine.process_key(&press('a'));

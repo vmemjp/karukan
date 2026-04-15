@@ -3,9 +3,9 @@ use super::*;
 // --- Live conversion tests ---
 
 #[test]
-fn test_live_conversion_disabled_by_default() {
+fn test_live_conversion_enabled_by_default() {
     let engine = InputMethodEngine::new();
-    assert!(!engine.live.enabled);
+    assert!(engine.live.enabled);
 }
 
 #[test]
@@ -18,6 +18,7 @@ fn test_live_conversion_enabled() {
 fn test_live_conversion_off_unchanged() {
     // With live_conversion=false, auto-suggest should show candidates (existing behavior)
     let mut engine = InputMethodEngine::new();
+    engine.live.enabled = false;
     assert!(!engine.live.enabled);
 
     // Type "ai" -> "あい" (standard hiragana preedit)
@@ -238,46 +239,46 @@ fn test_ctrl_space_fullwidth_space_commit() {
 #[test]
 fn test_ctrl_shift_l_toggles_live_conversion() {
     let mut engine = InputMethodEngine::new();
+    assert!(engine.live.enabled);
+
+    // Ctrl+Shift+L → toggle OFF (starts ON)
+    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
+    assert!(result.consumed);
     assert!(!engine.live.enabled);
 
-    // Ctrl+Shift+L → toggle ON
+    // Ctrl+Shift+L again → toggle ON
     let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
     assert!(result.consumed);
     assert!(engine.live.enabled);
-
-    // Ctrl+Shift+L again → toggle OFF
-    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
-    assert!(result.consumed);
-    assert!(!engine.live.enabled);
 }
 
 #[test]
 fn test_ctrl_shift_l_lowercase_toggles() {
     let mut engine = InputMethodEngine::new();
-    assert!(!engine.live.enabled);
+    assert!(engine.live.enabled);
 
-    // Ctrl+Shift+l (lowercase keysym) → toggle ON
+    // Ctrl+Shift+l (lowercase keysym) → toggle OFF (starts ON)
     let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L));
     assert!(result.consumed);
-    assert!(engine.live.enabled);
+    assert!(!engine.live.enabled);
 }
 
 #[test]
 fn test_ctrl_shift_l_shows_aux_text() {
     let mut engine = InputMethodEngine::new();
 
-    // Ctrl+Shift+L → check aux text shows "ライブ変換: ON"
+    // Ctrl+Shift+L → toggles OFF first (default is ON)
+    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
+    let has_aux = result.actions.iter().any(
+        |a| matches!(a, EngineAction::UpdateAuxText(text) if text.contains("ライブ変換: OFF")),
+    );
+    assert!(has_aux);
+
+    // Ctrl+Shift+L again → "ライブ変換: ON"
     let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
     let has_aux = result
         .actions
         .iter()
         .any(|a| matches!(a, EngineAction::UpdateAuxText(text) if text.contains("ライブ変換: ON")));
-    assert!(has_aux);
-
-    // Ctrl+Shift+L again → "ライブ変換: OFF"
-    let result = engine.process_key(&press_ctrl_shift(Keysym::KEY_L_UPPER));
-    let has_aux = result.actions.iter().any(
-        |a| matches!(a, EngineAction::UpdateAuxText(text) if text.contains("ライブ変換: OFF")),
-    );
     assert!(has_aux);
 }
