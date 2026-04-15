@@ -133,7 +133,10 @@ impl InputMethodEngine {
             metrics: ConversionMetrics::default(),
             input_mode: InputMode::Hiragana,
             input_buf: InputBuffer::new(),
-            live: LiveConversion::default(),
+            live: LiveConversion {
+                enabled: true,
+                text: String::new(),
+            },
             dicts: Dictionaries::default(),
             learning: None,
             remaining_after_conversion: None,

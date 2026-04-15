@@ -229,8 +229,21 @@ impl InputMethodEngine {
                 Keysym::KEY_E | Keysym::KEY_E_UPPER => return self.move_caret_end(),
                 // Ctrl+F: move right (Emacs-style Right)
                 Keysym::KEY_F | Keysym::KEY_F_UPPER => return self.move_caret_right(),
+                // Ctrl+H: backspace
+                Keysym::KEY_H | Keysym::KEY_H_UPPER => return self.backspace_composing(),
+                // Ctrl+I: commit as katakana (equivalent to F7)
+                Keysym::KEY_I | Keysym::KEY_I_UPPER => return self.direct_convert_katakana(),
                 _ => {}
             }
+        }
+
+        // Digit selection when suggest candidates are available (candidate window visible)
+        if self.suggest_candidates.is_some()
+            && !key.modifiers.control_key
+            && !key.modifiers.alt_key
+            && let Some(digit) = key.keysym.digit_value()
+        {
+            return self.select_suggest_by_digit(digit);
         }
 
         match key.keysym {

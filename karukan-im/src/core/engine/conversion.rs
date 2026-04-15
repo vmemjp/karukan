@@ -212,6 +212,44 @@ impl InputMethodEngine {
             ))
     }
 
+    /// Select from auto-suggest candidates by digit (1-9) in Composing state.
+    ///
+    /// If digit indexes into the stored suggest candidates, commits that candidate
+    /// directly. Falls back to no-op if the digit is out of range.
+    pub(super) fn select_suggest_by_digit(&mut self, digit: usize) -> EngineResult {
+        let candidates = match self.suggest_candidates.take() {
+            Some(c) if !c.is_empty() => c,
+            _ => return EngineResult::not_consumed(),
+        };
+
+        let idx = digit.saturating_sub(1);
+        if idx >= candidates.len() {
+            self.suggest_candidates = Some(candidates);
+            return EngineResult::consumed();
+        }
+
+        let chosen = candidates[idx].clone();
+        let reading = self.input_buf.text.clone();
+
+        if !reading.is_empty() {
+            self.record_learning(&reading, &chosen.text);
+        }
+
+        self.flush_romaji_to_composed();
+        self.converters.romaji.reset();
+        self.input_buf.cursor_pos = 0;
+        self.input_buf.clear_selection();
+        self.input_buf.text.clear();
+        self.live.text.clear();
+        self.enter_empty_state();
+
+        EngineResult::consumed()
+            .with_action(EngineAction::UpdatePreedit(Preedit::new()))
+            .with_action(EngineAction::HideCandidates)
+            .with_action(EngineAction::HideAuxText)
+            .with_action(EngineAction::Commit(chosen.text))
+    }
+
     /// Start kanji conversion
     pub(super) fn start_conversion(&mut self) -> EngineResult {
         self.suggest_candidates = None;
@@ -655,6 +693,8 @@ impl InputMethodEngine {
                     match key.keysym {
                         Keysym::KEY_N | Keysym::KEY_N_UPPER => return self.next_candidate(),
                         Keysym::KEY_P | Keysym::KEY_P_UPPER => return self.prev_candidate(),
+                        Keysym::KEY_H | Keysym::KEY_H_UPPER => return self.backspace_conversion(),
+                        Keysym::KEY_I | Keysym::KEY_I_UPPER => return self.direct_convert_katakana(),
                         _ => {}
                     }
                 }
