@@ -137,7 +137,9 @@
       devShells = forAllSystems (system:
         let
           pkgs = mkPkgs system;
-          toolchain = mkToolchain pkgs;
+          toolchain = (mkToolchain pkgs).override {
+            extensions = [ "rust-src" ];
+          };
         in
         {
           default = pkgs.mkShell {
